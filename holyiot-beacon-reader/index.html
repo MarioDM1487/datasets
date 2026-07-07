@@ -211,6 +211,27 @@ function decodeEddystone(dv){
   return {type:"Eddystone (frame 0x"+frame.toString(16)+")", fields:{}};
 }
 
+// Govee H5075 / H5072 hygrometer-thermometer. Broadcasts live readings under
+// company id 0xEC88: [flag][3-byte packed temp+humidity, big-endian][battery %].
+// packed = temp*10000 + humidity*10 ; MSB of packed = negative-temperature flag.
+function decodeGovee(companyId, dv){
+  if(companyId !== 0xec88) return null;
+  const b = bytes(dv);
+  if(b.length < 5) return null;
+  let packed = (b[1]<<16)|(b[2]<<8)|b[3];
+  const neg = (packed & 0x800000) !== 0;
+  const val = packed & 0x7fffff;
+  let temp = val/10000;
+  if(neg) temp = -temp;
+  const hum = (val % 1000)/10;
+  const batt = b[4];
+  return {type:"Govee H5075", metrics:{
+      temp:{v:temp.toFixed(1), unit:"°C"},
+      hum:{v:hum.toFixed(1), unit:"%"},
+      batt:{v:batt, unit:"%"},
+    }, fields:{"Temperatura":`${temp.toFixed(1)} °C`, "Umidità":`${hum.toFixed(1)} %`, "Batteria":`${batt} %`}};
+}
+
 // Best-effort HolyIoT / generic sensor manufacturer-data decoder.
 // HolyIoT sensor beacons pack readings into manufacturer specific data; exact
 // layout varies per model. We surface likely candidates so we can confirm the
@@ -277,6 +298,8 @@ function render(){
 
   listEl.innerHTML = recs.map(rec=>{
     const holy=looksHoly(rec);
+    const badge = (rec.name||"").toLowerCase().includes("holy") ? "HolyIoT"
+      : rec.decoded.some(d=>d.metrics) ? "sensore" : (holy ? "sensore?" : null);
     const tags=rec.decoded.map(d=>`<span class="tag ${d.type.startsWith('Eddystone-TLM')?'holy':''}">${d.type}</span>`).join(" ");
     // metrics row (battery/temp/pressure/humidity if decoded)
     let metrics="";
@@ -316,7 +339,7 @@ function render(){
     return `<div class="card ${holy?'holy':''}">
       <div class="row">
         <span class="name">${rec.name||"(senza nome)"}</span>
-        ${holy?'<span class="tag holy">HolyIoT?</span>':''}
+        ${badge?`<span class="tag holy">${badge}</span>`:''}
       </div>
       <div class="row" style="margin-top:2px">
         <span class="rssi">${signalBars(rec.rssi)}${rec.rssi} dBm</span>
@@ -355,6 +378,7 @@ function onAdv(e){
   const decoded=[];
   if(e.manufacturerData){
     for(const [cid,dv] of e.manufacturerData){
+      const gv=decodeGovee(cid,dv); if(gv){decoded.push(gv); rec.sensor=true; continue;}
       const ib=decodeIBeacon(cid,dv); if(ib){decoded.push(ib);continue;}
       const g=decodeSensorGuess(cid,dv); if(g) rec.sensor=true, rec._guess=g;
     }
