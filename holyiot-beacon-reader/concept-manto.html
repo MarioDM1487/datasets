@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>MANTO — Concept App Coperta Riscaldante</title>
+<style>
+  :root{
+    --bg:#ece3d2; --bg2:#e3d7c0; --surface:#fbf5ea; --surface2:#f1e7d5;
+    --ink:#2a2018; --muted:#7a6a54; --line:#ddccb2;
+    --accent:#7c3b46; --gold:#b98a3e;
+    --cold:#3f78b0; --ideal:#4f9a68; --hot:#cf5f3e;
+    --shadow:22px 34px 70px -38px rgba(52,34,16,.5);
+    --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#1b1512; --bg2:#120d0b; --surface:#241c18; --surface2:#2d241e;
+    --ink:#f0e7d9; --muted:#a99a86; --line:#3a2e26; --accent:#c9727f; --gold:#d3a559;
+    --shadow:22px 34px 80px -38px rgba(0,0,0,.72);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#1b1512; --bg2:#120d0b; --surface:#241c18; --surface2:#2d241e;
+    --ink:#f0e7d9; --muted:#a99a86; --line:#3a2e26; --accent:#c9727f; --gold:#d3a559;
+    --shadow:22px 34px 80px -38px rgba(0,0,0,.72);
+  }
+  :root[data-theme="light"]{
+    --bg:#ece3d2; --bg2:#e3d7c0; --surface:#fbf5ea; --surface2:#f1e7d5;
+    --ink:#2a2018; --muted:#7a6a54; --line:#ddccb2; --accent:#7c3b46; --gold:#b98a3e;
+    --shadow:22px 34px 70px -38px rgba(52,34,16,.5);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);
+    background:radial-gradient(130% 90% at 50% -10%,var(--bg2),var(--bg) 62%);
+    min-height:100vh;padding:34px 16px 60px}
+  .head{text-align:center;max-width:640px;margin:0 auto 26px}
+  .brand{font-family:var(--serif);font-size:40px;letter-spacing:.14em;margin:0;font-weight:700}
+  .brand .dot{color:var(--accent)}
+  .tag{color:var(--muted);font-size:14px;margin:6px 0 0;letter-spacing:.02em}
+  .kicker{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:700}
+
+  .gallery{display:flex;flex-wrap:wrap;gap:30px 26px;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:10px;width:330px;max-width:100%}
+  .cap{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+
+  .phone{width:330px;max-width:100%;background:var(--surface);border-radius:36px;
+    box-shadow:var(--shadow);border:1px solid var(--line);overflow:hidden}
+  .sb{display:flex;justify-content:space-between;padding:12px 22px 2px;font-size:11.5px;
+    color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+  .sc{padding:6px 17px 18px}
+
+  .top{display:flex;align-items:center;gap:11px;padding:10px 2px 14px}
+  .av{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:24px;
+    background:linear-gradient(150deg,var(--surface2),var(--bg2));border:1px solid var(--line)}
+  .top .nm{font-family:var(--serif);font-size:19px;font-weight:700}
+  .top .mt{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .top .sp{flex:1}
+  .pill{font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line)}
+  .pill.ok{color:var(--ideal);background:color-mix(in srgb,var(--ideal) 12%,transparent);border-color:color-mix(in srgb,var(--ideal) 30%,transparent)}
+  .pill.cold{color:var(--cold);background:color-mix(in srgb,var(--cold) 12%,transparent);border-color:color-mix(in srgb,var(--cold) 30%,transparent)}
+  .pill.hot{color:var(--hot);background:color-mix(in srgb,var(--hot) 12%,transparent);border-color:color-mix(in srgb,var(--hot) 30%,transparent)}
+
+  .hero{background:var(--surface2);border:1px solid var(--line);border-radius:20px;padding:16px}
+  .hero .word{font-family:var(--serif);font-size:26px;font-weight:700;display:flex;align-items:center;gap:9px}
+  .lamp{width:11px;height:11px;border-radius:50%}
+  .msg{font-size:13px;color:var(--muted);line-height:1.5;margin:9px 0 13px}
+  .band{position:relative;height:13px;border-radius:8px;
+    background:linear-gradient(90deg,var(--cold),#89b48f 30%,var(--ideal) 50%,#c8a05a 70%,var(--hot))}
+  .mk{position:absolute;top:-4px;width:4px;height:21px;background:var(--ink);border-radius:3px;
+    transform:translateX(-50%);box-shadow:0 0 0 3px var(--surface2)}
+  .bl{display:flex;justify-content:space-between;margin-top:7px;font-size:10px;
+    text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+  .tile{background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:11px 12px}
+  .tile .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .tile .v{font-size:21px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;line-height:1}
+  .tile .v small{font-size:11px;color:var(--muted);font-weight:600}
+  .tile .s{font-size:11px;color:var(--muted);margin-top:3px}
+
+  svg{display:block;width:100%;height:auto}
+  .nav{display:flex;justify-content:space-around;padding:11px 6px 4px;margin-top:12px;border-top:1px solid var(--line)}
+  .nav a{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--muted);text-decoration:none;font-weight:600}
+  .nav a.on{color:var(--accent)}
+  .nav svg{width:20px;height:20px}
+
+  /* alerts */
+  .sec{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;margin:14px 2px 8px}
+  .alert{display:flex;gap:11px;background:var(--surface2);border:1px solid var(--line);
+    border-radius:14px;padding:11px 12px;margin-bottom:8px;position:relative;overflow:hidden}
+  .alert .stripe{position:absolute;left:0;top:0;bottom:0;width:4px}
+  .alert .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto;font-size:17px}
+  .alert .body{flex:1;min-width:0}
+  .alert .t{font-weight:700;font-size:13.5px}
+  .alert .d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+  .alert .tm{font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .c-cold{color:var(--cold)} .bg-cold{background:color-mix(in srgb,var(--cold) 15%,transparent)}
+  .c-hot{color:var(--hot)} .bg-hot{background:color-mix(in srgb,var(--hot) 15%,transparent)}
+  .c-mut{color:var(--muted)} .bg-mut{background:color-mix(in srgb,var(--muted) 15%,transparent)}
+
+  /* profile */
+  .cover{height:96px;border-radius:18px;background:
+    linear-gradient(135deg,color-mix(in srgb,var(--accent) 60%,#000 0%),var(--gold));
+    position:relative;margin-bottom:34px;border:1px solid var(--line)}
+  .cover .pf{position:absolute;left:16px;bottom:-26px;width:60px;height:60px;border-radius:18px;
+    background:var(--surface);border:2px solid var(--surface);display:grid;place-items:center;font-size:30px;box-shadow:var(--shadow)}
+  .rowline{display:flex;justify-content:space-between;padding:11px 2px;border-bottom:1px solid var(--line);font-size:13.5px}
+  .rowline .k{color:var(--muted)} .rowline .v{font-weight:600;text-align:right}
+  .btn{display:block;width:100%;text-align:center;background:var(--accent);color:#fff;border:0;
+    border-radius:13px;padding:13px;font-weight:700;font-size:14px;margin-top:14px;font-family:var(--sans)}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+
+  /* pairing */
+  .steps{display:flex;gap:6px;margin:4px 2px 14px}
+  .steps i{flex:1;height:4px;border-radius:2px;background:var(--line)}
+  .steps i.on{background:var(--accent)}
+  .dev{display:flex;align-items:center;gap:11px;background:var(--surface2);border:1px solid var(--line);
+    border-radius:14px;padding:12px;margin-bottom:9px}
+  .dev .rd{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--bg2);font-size:15px}
+  .dev .nm{font-weight:700;font-size:13.5px} .dev .mt{font-size:11px;color:var(--muted);margin-top:1px}
+  .dev .role{font-size:11px;font-weight:700;padding:5px 9px;border-radius:8px;border:1px solid var(--accent);color:var(--accent)}
+  .scan{display:grid;place-items:center;padding:20px 0 8px}
+  .radar{width:96px;height:96px;border-radius:50%;border:2px solid var(--line);position:relative;display:grid;place-items:center}
+  .radar::before{content:"";position:absolute;inset:18px;border-radius:50%;border:2px solid var(--line)}
+  .radar .p{width:12px;height:12px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 20%,transparent)}
+  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <p class="kicker">Opzione A · Concept</p>
+  <h1 class="brand">MAN<span class="dot">·</span>TO</h1>
+  <p class="tag">La coperta che sa come sta il tuo cavallo. Monitoraggio del comfort termico.</p>
+</div>
+
+<div class="gallery">
+
+  <!-- HOME -->
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>5G · 96%</span></div>
+      <div class="sc">
+        <div class="top">
+          <div class="av">🐎</div>
+          <div><div class="nm">Fulmine</div><div class="mt">Coperta Winter 300g · box 4</div></div>
+          <div class="sp"></div>
+          <span class="pill ok">Al caldo</span>
+        </div>
+        <div class="hero">
+          <div class="word"><span class="lamp" style="background:var(--ideal)"></span>Ideale</div>
+          <p class="msg">La coperta mantiene Fulmine a <b>+22°</b> sull'esterno. Comfort ottimale, nessuna sudorazione.</p>
+          <div class="band"><div class="mk" style="left:52%"></div></div>
+          <div class="bl"><span>Freddo</span><span>Ideale</span><span>Sudore</span></div>
+        </div>
+        <div class="tiles">
+          <div class="tile"><div class="k">Sotto coperta</div><div class="v">26.3<small>°C</small></div><div class="s">microclima stabile</div></div>
+          <div class="tile"><div class="k">Esterno</div><div class="v">4.1<small>°C</small></div><div class="s">umidità 78%</div></div>
+          <div class="tile"><div class="k">Δ isolamento</div><div class="v">+22.2<small>°C</small></div><div class="s">coperta efficace</div></div>
+          <div class="tile"><div class="k">Umidità pelo</div><div class="v">54<small>%</small></div><div class="s">asciutto</div></div>
+        </div>
+        <div class="nav">
+          <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Oggi</a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5"/><path d="M4 15l5-5 4 3 6-7"/></svg>Storico</a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Avvisi</a>
+          <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Cavallo</a>
+        </div>
+      </div>
+    </div>
+    <span class="cap">Home · Oggi</span>
+  </div>
+
+  <!-- ALERTS -->
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>5G · 96%</span></div>
+      <div class="sc">
+        <div class="top"><div class="av">🔔</div><div><div class="nm">Avvisi</div><div class="mt">Fulmine · ultime 24 ore</div></div></div>
+        <div class="sec">Oggi</div>
+        <div class="alert"><div class="stripe" style="background:var(--cold)"></div>
+          <div class="ic c-cold bg-cold">❄️</div>
+          <div class="body"><div class="t">Troppo freddo</div><div class="d">Sotto coperta scesa a 11°C · esterno −3°C. Coperta insufficiente.</div></div>
+          <div class="tm">03:14</div></div>
+        <div class="alert"><div class="stripe" style="background:var(--hot)"></div>
+          <div class="ic c-hot bg-hot">💧</div>
+          <div class="body"><div class="t">Sudorazione rilevata</div><div class="d">Umidità sotto coperta 84% · dopo il movimento. Rischio di raffreddamento.</div></div>
+          <div class="tm">14:40</div></div>
+        <div class="sec">Sistema</div>
+        <div class="alert"><div class="stripe" style="background:var(--muted)"></div>
+          <div class="ic c-mut bg-mut">🔋</div>
+          <div class="body"><div class="t">Batteria sensore esterno 15%</div><div class="d">Sostituzione consigliata a breve.</div></div>
+          <div class="tm">08:05</div></div>
+      </div>
+    </div>
+    <span class="cap">Avvisi</span>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>5G · 96%</span></div>
+      <div class="sc">
+        <div class="top"><div class="av">📈</div><div><div class="nm">Storico</div><div class="mt">Sotto coperta vs esterno · 24h</div></div></div>
+        <div class="hero" style="padding:14px">
+          <svg id="mChart" viewBox="0 0 300 150" preserveAspectRatio="none"></svg>
+          <div class="bl" style="margin-top:10px">
+            <span style="color:var(--accent)">● Sotto coperta</span>
+            <span style="color:var(--cold)">● Esterno</span>
+            <span style="color:var(--ideal)">▬ Banda ideale</span>
+          </div>
+        </div>
+        <div class="tiles">
+          <div class="tile"><div class="k">Δ medio 24h</div><div class="v">+19.4<small>°C</small></div><div class="s">isolamento medio</div></div>
+          <div class="tile"><div class="k">Tempo in comfort</div><div class="v">91<small>%</small></div><div class="s">1h 50m fuori banda</div></div>
+        </div>
+      </div>
+    </div>
+    <span class="cap">Storico · Grafici</span>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>5G · 96%</span></div>
+      <div class="sc">
+        <div class="cover"><div class="pf">🐎</div></div>
+        <div style="font-family:var(--serif);font-size:22px;font-weight:700">Fulmine</div>
+        <div class="mt" style="color:var(--muted);font-size:12.5px;margin-bottom:8px">Sella Italiano · castrone · 8 anni</div>
+        <div class="rowline"><span class="k">Peso</span><span class="v">520 kg</span></div>
+        <div class="rowline"><span class="k">Coperta</span><span class="v">Manto Winter 300g</span></div>
+        <div class="rowline"><span class="k">Banda comfort</span><span class="v">22 – 30 °C</span></div>
+        <div class="rowline"><span class="k">Sensori abbinati</span><span class="v">2 · sotto coperta + esterno</span></div>
+        <div class="rowline"><span class="k">Box</span><span class="v">Scuderia Nord · 4</span></div>
+        <button class="btn">Modifica scheda</button>
+        <button class="btn ghost">Gestisci sensori</button>
+      </div>
+    </div>
+    <span class="cap">Scheda cavallo</span>
+  </div>
+
+  <!-- PAIRING -->
+  <div class="col">
+    <div class="phone">
+      <div class="sb"><span>9:41</span><span>5G · 96%</span></div>
+      <div class="sc">
+        <div class="top"><div class="av">➕</div><div><div class="nm">Abbina sensori</div><div class="mt">Passo 2 di 3 · assegna i ruoli</div></div></div>
+        <div class="steps"><i class="on"></i><i class="on"></i><i></i></div>
+        <div class="scan"><div class="radar"><div class="p"></div></div></div>
+        <div class="sec">Trovati vicino a te</div>
+        <div class="dev"><div class="rd">🌡️</div><div style="flex:1"><div class="nm">HolyIoT-25015 · A3</div><div class="mt">−41 dBm · batteria 96%</div></div><span class="role">Sotto coperta ✓</span></div>
+        <div class="dev"><div class="rd">☁️</div><div style="flex:1"><div class="nm">HolyIoT-25015 · B7</div><div class="mt">−53 dBm · batteria 88%</div></div><span class="role">Esterno ✓</span></div>
+        <button class="btn">Conferma abbinamento</button>
+      </div>
+    </div>
+    <span class="cap">Abbinamento sensori</span>
+  </div>
+
+</div>
+
+<p class="foot">MANTO · mockup statico, dati d'esempio · soglie da tarare con il veterinario</p>
+
+<script>
+  (function(){
+    const svg=document.getElementById('mChart'); if(!svg) return;
+    const W=300,H=150,pad=8;
+    const body=[25,25.5,24,23,22.5,24,26,27,26.5,26,25.5,26.3];
+    const ext =[6,5,4,3,2.5,3,4,6,7,6.5,5,4.1];
+    const lo=-2, hi=30;
+    const x=i=>pad+i*(W-2*pad)/(body.length-1);
+    const y=v=>H-pad-(v-lo)/(hi-lo)*(H-2*pad);
+    const path=a=>a.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');
+    const bandTop=y(30), bandBot=y(22);
+    svg.innerHTML=`
+      <rect x="${pad}" y="${bandTop.toFixed(1)}" width="${W-2*pad}" height="${(bandBot-bandTop).toFixed(1)}"
+        fill="color-mix(in srgb,var(--ideal) 16%,transparent)"/>
+      <line x1="${pad}" x2="${W-pad}" y1="${bandTop.toFixed(1)}" y2="${bandTop.toFixed(1)}" stroke="var(--ideal)" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>
+      <line x1="${pad}" x2="${W-pad}" y1="${bandBot.toFixed(1)}" y2="${bandBot.toFixed(1)}" stroke="var(--ideal)" stroke-width="1" stroke-dasharray="3 4" opacity=".7"/>
+      <path d="${path(ext)}" fill="none" stroke="var(--cold)" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="${path(body)}" fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linejoin="round"/>
+      <circle cx="${x(body.length-1).toFixed(1)}" cy="${y(body[body.length-1]).toFixed(1)}" r="4" fill="var(--accent)" stroke="var(--surface2)" stroke-width="2.5"/>`;
+  })();
+</script>
+</body>
+</html>
