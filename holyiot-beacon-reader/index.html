@@ -37,6 +37,8 @@
   button.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line);flex:0 0 auto}
   button.connect{width:100%;margin:0 0 12px;background:var(--panel2);color:var(--txt);
     border:1px solid var(--acc);font-size:14px}
+  button.mini{flex:0 0 auto;font-size:12px;padding:6px 10px;border-radius:8px;min-height:0;
+    background:var(--panel2);color:var(--acc);border:1px solid var(--line);font-weight:600}
   button:disabled{opacity:.45}
   button:active{transform:scale(.98)}
   .stat{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
@@ -111,6 +113,7 @@
 
   <div class="bar">
     <button id="scan">Avvia scansione</button>
+    <button id="pause" class="sec">⏸ Pausa</button>
     <button id="clear" class="sec">Pulisci</button>
   </div>
 
@@ -127,15 +130,17 @@ const $ = s => document.querySelector(s);
 const listEl = $("#list"), noticeEl = $("#notice"), dotEl = $("#dot");
 const state = new Map();        // key(address|name) -> device record
 const expanded = new Set();      // device keys whose "raw" section is open
-let pktCount = 0, scanning = false, leScan = null, renderPending = false;
+let pktCount = 0, scanning = false, leScan = null, renderPending = false, frozen = false;
 
 // Coalesce redraws: beacons advertise several times/second, and a full
 // innerHTML rebuild on every packet would wipe the DOM mid-tap (making the
 // "Dati grezzi" section impossible to open). Throttle to ~500ms.
+// When frozen (Pausa), skip redraws entirely so the screen holds still for
+// reading/copying — incoming packets still update state underneath.
 function scheduleRender(){
-  if(renderPending) return;
+  if(renderPending || frozen) return;
   renderPending = true;
-  setTimeout(()=>{ renderPending = false; render(); }, 500);
+  setTimeout(()=>{ renderPending = false; if(!frozen) render(); }, 500);
 }
 
 const hex = (dv, sep=" ") => {
@@ -340,6 +345,7 @@ function render(){
       <div class="row">
         <span class="name">${rec.name||"(senza nome)"}</span>
         ${badge?`<span class="tag holy">${badge}</span>`:''}
+        <button class="mini" data-copy="${rec.key}">📋 Copia</button>
       </div>
       <div class="row" style="margin-top:2px">
         <span class="rssi">${signalBars(rec.rssi)}${rec.rssi} dBm</span>
@@ -486,11 +492,58 @@ async function connectSensor(){
   }
 }
 
+// Build a plain-text dump of a device's raw frames + decoded values, for copy.
+function deviceRawText(rec){
+  let t = `${rec.name||"(senza nome)"}  (${rec.rssi} dBm)\n`;
+  if(rec.address) t += `MAC/ID: ${rec.address}\n`;
+  rec.decoded.forEach(d=>{
+    if(d.fields) for(const [k,v] of Object.entries(d.fields)) t += `${d.type} · ${k}: ${v}\n`;
+  });
+  for(const {cid,dv} of rec.mfg.values()){
+    const b=bytes(dv);
+    t += `Manufacturer 0x${cid.toString(16).padStart(4,"0")}:\n`;
+    t += "  idx: "+[...b].map((_,i)=>i.toString().padStart(2,"0")).join(" ")+"\n";
+    t += "  hex: "+[...b].map(x=>x.toString(16).padStart(2,"0")).join(" ")+"\n";
+  }
+  for(const [uuid,dv] of rec.svc){
+    const b=bytes(dv);
+    t += `Service ${uuid}:\n`;
+    t += "  hex: "+[...b].map(x=>x.toString(16).padStart(2,"0")).join(" ")+"\n";
+  }
+  return t;
+}
+
 $("#connect").addEventListener("click", connectSensor);
 $("#scan").addEventListener("click", toggleScan);
 $("#clear").addEventListener("click", ()=>{ state.clear(); expanded.clear(); pktCount=0; render(); });
 $("#sort").addEventListener("change", render);
 $("#onlyHoly").addEventListener("change", render);
+
+// Pausa: freeze the view so it can be read/copied without packets scrolling it.
+$("#pause").addEventListener("click", ()=>{
+  frozen = !frozen;
+  $("#pause").textContent = frozen ? "▶ Riprendi" : "⏸ Pausa";
+  dotEl.style.opacity = frozen ? "0.4" : "1";
+  if(!frozen) render();
+});
+
+// Copy a device's raw data to the clipboard (one tap → paste anywhere).
+listEl.addEventListener("click", async e=>{
+  const btn = e.target.closest("[data-copy]");
+  if(!btn) return;
+  const rec = state.get(btn.dataset.copy);
+  if(!rec) return;
+  const text = deviceRawText(rec);
+  try{
+    await navigator.clipboard.writeText(text);
+    const old = btn.textContent; btn.textContent = "✅ Copiato";
+    setTimeout(()=>{ btn.textContent = old; }, 1500);
+  }catch(_){
+    // Fallback: drop the text into a selectable box for manual copy.
+    noticeEl.innerHTML = `<div class="msg">Copia automatica bloccata — seleziona e copia:<br>
+      <textarea readonly style="width:100%;height:120px;margin-top:6px;font-family:monospace;font-size:11px">${text.replace(/</g,"&lt;")}</textarea></div>`;
+  }
+});
 
 // Remember which cards are expanded across redraws. The `toggle` event does
 // not bubble, so we listen in the capture phase to catch it from any <details>.
