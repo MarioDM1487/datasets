@@ -39,6 +39,31 @@
     border:1px solid var(--acc);font-size:14px}
   button.mini{flex:0 0 auto;font-size:12px;padding:6px 10px;border-radius:8px;min-height:0;
     background:var(--panel2);color:var(--acc);border:1px solid var(--line);font-weight:600}
+  /* health panel */
+  .health{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px}
+  .health.empty2{border-style:dashed;color:var(--dim);font-size:13px;line-height:1.5}
+  .health .hhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .health .hhead h2{margin:0;font-size:15px}
+  .health select{margin-left:auto;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  .zone{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+  .z0{background:#12351f;color:#7ee7b0;border:1px solid #1f6b42}
+  .z1{background:#3a3410;color:#ffd86b;border:1px solid #7a6a1c}
+  .z2{background:#402611;color:#ffab5e;border:1px solid #8a531f}
+  .z3{background:#3f1414;color:#ff8080;border:1px solid #8a2020}
+  .health .grid{display:flex;gap:8px;flex-wrap:wrap}
+  .hcell{flex:1;min-width:100px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px}
+  .hcell .k{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.03em}
+  .hcell .v{font-size:17px;font-weight:700;font-family:var(--mono);margin-top:2px}
+  .hcell .v small{font-size:11px;color:var(--dim);font-weight:500}
+  .hstatus{font-size:14px;font-weight:700;margin:10px 0 2px}
+  .hnote{font-size:11.5px;color:var(--dim);margin-top:6px;line-height:1.5}
+  .alarm{background:#3f1414;border:1px solid #8a2020;color:#ff9a9a;border-radius:10px;
+    padding:11px;margin-top:10px;font-weight:800;text-align:center;animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.5}}
+  .rolebtns{display:flex;gap:6px;margin-top:10px}
+  .rolebtn{flex:1;font-size:12px;padding:8px 6px;border-radius:8px;background:var(--panel2);
+    border:1px solid var(--line);color:var(--dim);font-weight:600}
+  .rolebtn.on{border-color:var(--acc);color:var(--acc);background:#12233f}
   button:disabled{opacity:.45}
   button:active{transform:scale(.98)}
   .stat{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
@@ -89,8 +114,10 @@
 </style>
 </head>
 <body>
-  <h1><span class="dot" id="dot"></span> HolyIoT Beacon Reader</h1>
-  <p class="sub">Scanner BLE via Web Bluetooth · decodifica iBeacon / Eddystone / dati sensore</p>
+  <h1><span class="dot" id="dot"></span> Monitor Salute Animale</h1>
+  <p class="sub">HolyIoT · temperatura, umidità, pressione · indice di stress da caldo & allarmi</p>
+
+  <div id="health" class="health"></div>
 
   <div class="stat">
     <span class="chip">Dispositivi <b id="cDev">0</b></span>
@@ -131,6 +158,130 @@ const listEl = $("#list"), noticeEl = $("#notice"), dotEl = $("#dot");
 const state = new Map();        // key(address|name) -> device record
 const expanded = new Set();      // device keys whose "raw" section is open
 let pktCount = 0, scanning = false, leScan = null, renderPending = false, frozen = false;
+
+// ---------- health monitoring (Fase 1) ----------
+// Sensor roles: which device is worn on the animal (body) vs measuring ambient
+// (the twin sensor). Persisted so they survive reloads.
+let roles = {};
+try{ roles = JSON.parse(localStorage.getItem("roles")||"{}"); }catch(_){ roles={}; }
+let species = localStorage.getItem("species") || "cavallo";
+let alarmActive = false;   // tracks danger transitions for the beep
+
+// Species profiles. Heat-stress thresholds are INDICATIVE (to refine with a vet).
+// - Cavallo: equine Heat Index = air °F + RH%. <130 sicuro, 130-150 monitora,
+//   150-180 attenzione, >180 pericolo (raffreddamento inefficace).
+// - Cane: apparent-heat zones on ambient °C, peggiorate dall'umidità alta
+//   (il cane si raffredda ansimando, l'umidità lo penalizza).
+const SPECIES = {
+  cavallo: {
+    label:"Cavallo",
+    body:{ warnC:38.8, dangerC:39.4 },      // rialzo termico indicativo
+    heatZone(t, rh){
+      const hi = Math.round(t*9/5 + 32 + rh);
+      const level = hi<130?0 : hi<150?1 : hi<180?2 : 3;
+      return { index:hi, unit:"HI", level };
+    }
+  },
+  cane: {
+    label:"Cane",
+    body:{ warnC:39.7, dangerC:40.5 },
+    heatZone(t, rh){
+      const thi = Math.round((1.8*t+32) - (0.55 - 0.0055*rh)*(1.8*t - 26));
+      let level = t<25?0 : t<29?1 : t<32?2 : 3;
+      if(rh>70 && level<3) level++;         // umidità alta = meno margine
+      return { index:thi, unit:"THI", level };
+    }
+  }
+};
+const ZONES = [
+  {cls:"z0", label:"Sicuro"},
+  {cls:"z1", label:"Monitora"},
+  {cls:"z2", label:"Attenzione"},
+  {cls:"z3", label:"PERICOLO"},
+];
+
+function metricsOf(rec){
+  const m={};
+  (rec && rec.decoded || []).forEach(d=>{
+    if(d.metrics) for(const [k,v] of Object.entries(d.metrics)){
+      const n=parseFloat(v.v); if(!isNaN(n)) m[k]=n;
+    }
+  });
+  return m;
+}
+
+function computeHealth(){
+  const sp = SPECIES[species];
+  const amb = roles.ambient ? metricsOf(state.get(roles.ambient)) : null;
+  const body = roles.body ? metricsOf(state.get(roles.body)) : null;
+  // ambient heat zone: prefer the ambient (twin) sensor; fall back to body sensor
+  const src = (amb && amb.temp!=null && amb.hum!=null) ? amb
+            : (body && body.temp!=null && body.hum!=null) ? body : null;
+  const hz = src ? sp.heatZone(src.temp, src.hum) : null;
+  let bodyLevel=0, delta=null;
+  if(body && body.temp!=null){
+    if(amb && amb.temp!=null) delta = body.temp - amb.temp;
+    if(body.temp>=sp.body.dangerC) bodyLevel=3;
+    else if(body.temp>=sp.body.warnC) bodyLevel=2;
+  }
+  const level = Math.max(hz?hz.level:0, bodyLevel);
+  return { sp, amb, body, hz, bodyLevel, delta, level, hasAny:!!(amb||body) };
+}
+
+function beep(){
+  try{
+    const AC = window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    const a=new AC(), o=a.createOscillator(), g=a.createGain();
+    o.connect(g); g.connect(a.destination); o.type="square"; o.frequency.value=880;
+    g.gain.value=0.15; o.start();
+    o.frequency.setValueAtTime(880, a.currentTime); o.frequency.setValueAtTime(660, a.currentTime+0.2);
+    o.stop(a.currentTime+0.5);
+  }catch(_){}
+}
+
+function cell(k, v, unit){
+  return `<div class="hcell"><div class="k">${k}</div><div class="v">${v}${unit?`<small> ${unit}</small>`:""}</div></div>`;
+}
+
+function renderHealth(){
+  const el=$("#health"); if(!el) return;
+  const selector = `<select id="species">
+      <option value="cavallo"${species==="cavallo"?" selected":""}>🐎 Cavallo</option>
+      <option value="cane"${species==="cane"?" selected":""}>🐕 Cane</option>
+    </select>`;
+
+  const h=computeHealth();
+  if(!h.hasAny){
+    el.className="health empty2";
+    el.innerHTML=`<div class="hhead"><h2>Monitor salute</h2>${selector}</div>
+      Assegna i sensori: scansiona, poi su una scheda tocca <b>🩺 Corpo</b> (indossato dall'animale)
+      e <b>🌡️ Ambiente</b> (sensore gemello). L'indice di stress da caldo comparirà qui.`;
+    return;
+  }
+  el.className="health";
+  const z=ZONES[h.level];
+
+  // alarm beep on transition into PERICOLO
+  if(h.level===3 && !alarmActive){ alarmActive=true; beep(); }
+  else if(h.level<3){ alarmActive=false; }
+
+  let cells="";
+  if(h.amb && h.amb.temp!=null) cells+=cell("Ambiente T", h.amb.temp.toFixed(1), "°C");
+  if(h.amb && h.amb.hum!=null)  cells+=cell("Ambiente UR", h.amb.hum.toFixed(0), "%");
+  if(h.hz)                      cells+=cell("Indice "+h.hz.unit, h.hz.index, "");
+  if(h.body && h.body.temp!=null) cells+=cell("Corpo T", h.body.temp.toFixed(1), "°C");
+  if(h.delta!=null)             cells+=cell("Δ corpo−amb", (h.delta>=0?"+":"")+h.delta.toFixed(1), "°C");
+
+  const msgs={0:"Condizioni sicure.",1:"Tenere d'occhio: caldo in aumento.",
+    2:"Attenzione: rischio stress da caldo.",3:"PERICOLO: troppo caldo per l'animale!"};
+
+  el.innerHTML=`<div class="hhead"><h2>${h.sp.label}</h2><span class="zone ${z.cls}">${z.label}</span>${selector}</div>
+    <div class="grid">${cells}</div>
+    <div class="hstatus">${msgs[h.level]}</div>
+    ${h.level>=3?`<div class="alarm">🔴 ALLARME · TROPPO CALDO</div>`:""}
+    <div class="hnote">Indici indicativi (da tarare con il veterinario). L'indice di calore usa il
+      sensore <b>Ambiente</b>; il rialzo del sensore <b>Corpo</b> e il Δ verso l'ambiente segnalano il carico termico dell'animale.</div>`;
+}
 
 // Coalesce redraws: beacons advertise several times/second, and a full
 // innerHTML rebuild on every packet would wipe the DOM mid-tap (making the
@@ -321,6 +472,7 @@ function render(){
 
   $("#cDev").textContent=state.size;
   $("#cPkt").textContent=pktCount;
+  renderHealth();
 
   if(recs.length===0){
     listEl.innerHTML=`<div class="empty">
@@ -385,6 +537,10 @@ function render(){
       ${rec.address?`<div class="mac">${rec.address}</div>`:""}
       <div style="margin-top:8px">${tags||'<span class="tag">advertisement</span>'}</div>
       ${metrics?`<div class="metrics">${metrics}</div>`:""}
+      ${mset.temp!=null?`<div class="rolebtns">
+        <button class="rolebtn ${roles.body===rec.key?"on":""}" data-role="body" data-key="${rec.key}">🩺 Corpo${roles.body===rec.key?" ✓":""}</button>
+        <button class="rolebtn ${roles.ambient===rec.key?"on":""}" data-role="ambient" data-key="${rec.key}">🌡️ Ambiente${roles.ambient===rec.key?" ✓":""}</button>
+      </div>`:""}
       ${(fields||raw)?`<details data-key="${rec.key}" ${expanded.has(rec.key)?"open":""}><summary>Dati grezzi & decodifica</summary>${fields}${raw}
         <div class="foot" style="text-align:left;margin-top:8px">
         Se pressione/temperatura non compaiono tra le metriche, copiami la riga
@@ -560,6 +716,30 @@ $("#pause").addEventListener("click", ()=>{
   if(!frozen) render();
 });
 
+// Assign a sensor to the Corpo/Ambiente role (toggle). Persisted.
+listEl.addEventListener("click", e=>{
+  const btn = e.target.closest("[data-role]");
+  if(!btn) return;
+  const role = btn.dataset.role, key = btn.dataset.key;
+  if(roles[role]===key){ delete roles[role]; }        // tap again to unassign
+  else{
+    roles[role]=key;
+    const other = role==="body" ? "ambient" : "body"; // a sensor can't be both
+    if(roles[other]===key) delete roles[other];
+  }
+  localStorage.setItem("roles", JSON.stringify(roles));
+  render();
+});
+
+// Species change (event delegated: #species lives inside the rebuilt panel).
+$("#health").addEventListener("change", e=>{
+  if(e.target.id!=="species") return;
+  species = e.target.value;
+  localStorage.setItem("species", species);
+  alarmActive=false;
+  renderHealth();
+});
+
 // Copy a device's raw data to the clipboard (one tap → paste anywhere).
 listEl.addEventListener("click", async e=>{
   const btn = e.target.closest("[data-copy]");
@@ -586,8 +766,8 @@ listEl.addEventListener("toggle", e=>{
   if(d.open) expanded.add(d.dataset.key); else expanded.delete(d.dataset.key);
 }, true);
 
-// refresh "age" periodically
-setInterval(()=>{ if(scanning) render(); }, 2000);
+// refresh "age" + health periodically (skip while paused)
+setInterval(()=>{ if(scanning && !frozen) render(); }, 2000);
 
 // initial capability hint
 if(!navigator.bluetooth){

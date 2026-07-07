@@ -1,13 +1,28 @@
-# HolyIoT Beacon Reader
+# Monitor Salute Animale (HolyIoT Beacon Reader)
 
-Webapp per leggere i beacon **BLE HolyIoT** dal telefono, usando la **Web Bluetooth API**.
-Mostra tutto ciò che il beacon trasmette (RSSI, indirizzo, manufacturer/service data in
-hex) e decodifica i formati noti:
+Webapp per leggere i beacon **BLE HolyIoT** dal telefono (**Web Bluetooth API**) e
+monitorare lo **stress da caldo** di un animale che indossa il sensore. Base del progetto
+(Fase 1) per cavalli 🐎 e cani 🐕.
 
+## Funzioni sensore
+
+- **HolyIoT-25015** — temperatura (SHT40), umidità, **pressione** (LPS22HB), decodificati
+  dall'advertisement (senza connessione né password)
 - **iBeacon** — UUID, major, minor, potenza Tx
 - **Eddystone** — URL, UID, e **TLM** (batteria in mV, temperatura in °C, uptime)
-- **Sensori** — decoder best-effort dei manufacturer data + dump hex per mappare il
-  formato esatto del tuo modello (temperatura / pressione / umidità / batteria)
+- **Govee H5075** — temperatura / umidità / batteria
+- Lettura **batteria** via connessione GATT
+- **Pausa** (congela la vista) e **📋 Copia** (hex negli appunti) per il debug
+
+## Monitor salute (Fase 1)
+
+- Profili per **specie** (cavallo / cane) con soglie indicative
+- Assegnazione dei due sensori: **🩺 Corpo** (indossato) e **🌡️ Ambiente** (gemello)
+- **Indice di stress da caldo**: Heat Index equino (°F+UR) per il cavallo, THI per il cane
+- **Δ corpo−ambiente** come carico termico dell'animale
+- **Allarme "troppo caldo"** con avviso visivo + beep
+
+> ⚠️ Le soglie sono **indicative**, da tarare con un veterinario.
 
 ## Requisiti (importante)
 
