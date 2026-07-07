@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1020" />
+<title>HolyIoT Beacon Reader</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<style>
+  :root{
+    --bg:#0b1020; --panel:#141a2e; --panel2:#1b2340; --line:#26304f;
+    --txt:#e8edff; --dim:#95a0c4; --acc:#5b9dff; --good:#3ddc97; --warn:#ffcc55; --bad:#ff6b6b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    padding:max(12px,env(safe-area-inset-top)) 12px calc(90px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased;
+  }
+  h1{font-size:19px;margin:4px 0 2px;display:flex;align-items:center;gap:8px}
+  h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--dim);flex:0 0 auto}
+  h1 .dot.on{background:var(--good);box-shadow:0 0 10px var(--good)}
+  .sub{color:var(--dim);font-size:12.5px;margin:0 0 12px}
+  .bar{
+    position:fixed;left:0;right:0;bottom:0;z-index:5;
+    background:linear-gradient(180deg,rgba(11,16,32,0),var(--bg) 30%);
+    padding:14px 12px calc(14px + env(safe-area-inset-bottom));
+    display:flex;gap:8px;align-items:center;
+  }
+  button{
+    font:inherit;font-weight:600;border:0;border-radius:12px;padding:13px 16px;
+    background:var(--acc);color:#04122e;flex:1;min-height:48px;
+  }
+  button.sec{background:var(--panel2);color:var(--txt);border:1px solid var(--line);flex:0 0 auto}
+  button:disabled{opacity:.45}
+  button:active{transform:scale(.98)}
+  .stat{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:6px 11px;font-size:12px;color:var(--dim)}
+  .chip b{color:var(--txt)}
+  .msg{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);
+    border-radius:10px;padding:11px 13px;font-size:13px;color:var(--dim);margin:0 0 12px;line-height:1.5}
+  .msg.err{border-left-color:var(--bad)}
+  .msg a{color:var(--acc)}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:12px 13px;margin:0 0 10px;overflow:hidden;
+  }
+  .card.holy{border-color:#3a5bd0;box-shadow:0 0 0 1px #3a5bd055 inset}
+  .row{display:flex;align-items:center;gap:10px}
+  .name{font-weight:700;font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tag{font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;background:var(--panel2);color:var(--acc);white-space:nowrap}
+  .tag.holy{background:#3a5bd0;color:#fff}
+  .rssi{font-family:var(--mono);font-size:13px;color:var(--dim);white-space:nowrap}
+  .bars{display:inline-flex;gap:2px;align-items:flex-end;height:14px;margin-right:5px;vertical-align:-2px}
+  .bars i{width:3px;background:var(--line);border-radius:1px}
+  .bars i.on{background:var(--good)}
+  .mac{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:3px}
+  .metrics{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .metric{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:7px 10px;min-width:78px}
+  .metric .k{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+  .metric .v{font-size:16px;font-weight:700;font-family:var(--mono);margin-top:2px}
+  .metric .v small{font-size:11px;color:var(--dim);font-weight:500}
+  details{margin-top:10px;border-top:1px dashed var(--line);padding-top:9px}
+  summary{font-size:12px;color:var(--dim);cursor:pointer;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ ";color:var(--acc)}
+  details[open] summary::before{content:"▾ "}
+  .kv{margin-top:8px}
+  .kv .l{display:flex;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px solid #ffffff08}
+  .kv .l .k{color:var(--dim);flex:0 0 42%}
+  .kv .l .v{font-family:var(--mono);word-break:break-all;flex:1}
+  .hex{font-family:var(--mono);font-size:11px;color:var(--good);word-break:break-all;
+    background:#0007;border-radius:8px;padding:8px 9px;margin-top:6px;line-height:1.55}
+  .hex .lbl{color:var(--dim)}
+  .empty{text-align:center;color:var(--dim);padding:40px 20px;font-size:13.5px;line-height:1.6}
+  .empty svg{opacity:.3;margin-bottom:10px}
+  .foot{color:var(--dim);font-size:11px;text-align:center;margin-top:14px;line-height:1.6}
+  select{font:inherit;background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:10px;padding:8px 10px}
+</style>
+</head>
+<body>
+  <h1><span class="dot" id="dot"></span> HolyIoT Beacon Reader</h1>
+  <p class="sub">Scanner BLE via Web Bluetooth · decodifica iBeacon / Eddystone / dati sensore</p>
+
+  <div class="stat">
+    <span class="chip">Dispositivi <b id="cDev">0</b></span>
+    <span class="chip">Pacchetti <b id="cPkt">0</b></span>
+    <span class="chip">Ordina
+      <select id="sort">
+        <option value="rssi">segnale</option>
+        <option value="seen">più recenti</option>
+        <option value="name">nome</option>
+      </select>
+    </span>
+    <span class="chip"><label><input type="checkbox" id="onlyHoly"> solo HolyIoT/sensori</label></span>
+  </div>
+
+  <div id="notice"></div>
+  <div id="list"></div>
+
+  <div class="bar">
+    <button id="scan">Avvia scansione</button>
+    <button id="clear" class="sec">Pulisci</button>
+  </div>
+
+  <p class="foot">
+    Android + Chrome: attiva <code>chrome://flags/#enable-experimental-web-platform-features</code><br>
+    La pagina deve essere servita in HTTPS. iOS/Safari non supporta Web Bluetooth.
+  </p>
+
+<script>
+"use strict";
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const listEl = $("#list"), noticeEl = $("#notice"), dotEl = $("#dot");
+const state = new Map();        // key(address|name) -> device record
+let pktCount = 0, scanning = false, leScan = null;
+
+const hex = (dv, sep=" ") => {
+  const b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+  return [...b].map(x => x.toString(16).padStart(2,"0")).join(sep);
+};
+const bytes = dv => new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+
+function notice(html, cls=""){
+  noticeEl.innerHTML = html ? `<div class="msg ${cls}">${html}</div>` : "";
+}
+
+// ---------- decoders ----------
+
+// iBeacon: Apple company id 0x004C, type 0x02, len 0x15
+function decodeIBeacon(companyId, dv){
+  if(companyId !== 0x004c) return null;
+  const b = bytes(dv);
+  if(b.length < 23 || b[0] !== 0x02 || b[1] !== 0x15) return null;
+  const uuid = [...b.slice(2,18)].map(x=>x.toString(16).padStart(2,"0")).join("");
+  const fmt = `${uuid.slice(0,8)}-${uuid.slice(8,12)}-${uuid.slice(12,16)}-${uuid.slice(16,20)}-${uuid.slice(20)}`;
+  const major = (b[18]<<8)|b[19], minor=(b[20]<<8)|b[21];
+  const txAt1m = (b[22]<<24>>24); // signed
+  return {type:"iBeacon", fields:{UUID:fmt, Major:major, Minor:minor, "Tx@1m":`${txAt1m} dBm`}};
+}
+
+// Eddystone: service data on UUID 0xFEAA
+function decodeEddystone(dv){
+  const b = bytes(dv);
+  if(b.length < 1) return null;
+  const frame = b[0];
+  if(frame === 0x00){ // UID
+    const tx = b[1]<<24>>24;
+    const ns = [...b.slice(2,12)].map(x=>x.toString(16).padStart(2,"0")).join("");
+    const inst = [...b.slice(12,18)].map(x=>x.toString(16).padStart(2,"0")).join("");
+    return {type:"Eddystone-UID", fields:{"Tx@0m":`${tx} dBm`, Namespace:ns, Instance:inst}};
+  }
+  if(frame === 0x10){ // URL
+    const schemes=["http://www.","https://www.","http://","https://"];
+    const exp={0:".com/",1:".org/",2:".edu/",3:".net/",4:".info/",5:".biz/",6:".gov/",
+      7:".com",8:".org",9:".edu",10:".net",11:".info",12:".biz",13:".gov"};
+    const tx=b[1]<<24>>24; let url=schemes[b[2]]||"";
+    for(let i=3;i<b.length;i++){ url += (b[i]<0x0e)?(exp[b[i]]||""):String.fromCharCode(b[i]); }
+    return {type:"Eddystone-URL", fields:{"Tx@0m":`${tx} dBm`, URL:url}};
+  }
+  if(frame === 0x20){ // TLM  -> batteria + temperatura
+    const version=b[1];
+    const dvv=new DataView(b.buffer,b.byteOffset,b.byteLength);
+    const vbatt=dvv.getUint16(2,false);       // mV
+    const tRaw=dvv.getInt16(4,false);          // 8.8 fixed
+    const temp=tRaw/256;
+    const advCnt=dvv.getUint32(6,false);
+    const secCnt=dvv.getUint32(10,false);
+    return {type:"Eddystone-TLM", metrics:{
+        batt:{v:vbatt, unit:"mV"},
+        temp:{v:temp.toFixed(2), unit:"°C"},
+      }, fields:{Versione:version, "Batteria":`${vbatt} mV`, "Temperatura":`${temp.toFixed(2)} °C`,
+        "Adv count":advCnt, "Uptime":`${(secCnt/10).toFixed(0)} s`}};
+  }
+  return {type:"Eddystone (frame 0x"+frame.toString(16)+")", fields:{}};
+}
+
+// Best-effort HolyIoT / generic sensor manufacturer-data decoder.
+// HolyIoT sensor beacons pack readings into manufacturer specific data; exact
+// layout varies per model. We surface likely candidates so we can confirm the
+// real layout from the raw hex, then lock it in.
+function decodeSensorGuess(companyId, dv){
+  const b = bytes(dv);
+  if(b.length < 4) return null;
+  const dvv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const out = {};
+  // Common HolyIoT layouts observed: temp (int16, /100 or /10), humidity (uint16 /100),
+  // pressure (uint16/uint24), battery (uint8 % or uint16 mV). We show plausible reads.
+  const cand = [];
+  for(let i=0;i+1<b.length;i++){
+    const s16 = dvv.getInt16(i,false), u16 = dvv.getUint16(i,false);
+    const s16le = dvv.getInt16(i,true), u16le = dvv.getUint16(i,true);
+    cand.push({off:i, be_s:s16, be_u:u16, le_s:s16le, le_u:u16le});
+  }
+  return {companyId, candidates:cand, raw:b};
+}
+
+function companyName(id){
+  const m={0x004c:"Apple",0x0059:"Nordic",0x0006:"Microsoft",0x00e0:"Google",
+    0x0499:"Ruuvi",0x05ac:"Apple",0xffff:"test/dev"};
+  return m[id] || null;
+}
+
+// ---------- rendering ----------
+function signalBars(rssi){
+  const n = rssi>=-55?4 : rssi>=-67?3 : rssi>=-80?2 : rssi>=-90?1 : 0;
+  let h="";
+  for(let i=0;i<4;i++) h+=`<i class="${i<n?'on':''}" style="height:${4+i*3}px"></i>`;
+  return `<span class="bars">${h}</span>`;
+}
+
+function looksHoly(rec){
+  const n=(rec.name||"").toLowerCase();
+  if(n.includes("holy")||n.includes("holyiot")) return true;
+  if(rec.decoded.some(d=>d.type==="Eddystone-TLM")) return true;
+  if(rec.sensor) return true;
+  return false;
+}
+
+function render(){
+  const sort=$("#sort").value, onlyHoly=$("#onlyHoly").checked;
+  let recs=[...state.values()];
+  if(onlyHoly) recs=recs.filter(looksHoly);
+  recs.sort((a,b)=>{
+    if(sort==="rssi") return (b.rssi??-999)-(a.rssi??-999);
+    if(sort==="seen") return b.seen-a.seen;
+    return (a.name||"~").localeCompare(b.name||"~");
+  });
+
+  $("#cDev").textContent=state.size;
+  $("#cPkt").textContent=pktCount;
+
+  if(recs.length===0){
+    listEl.innerHTML=`<div class="empty">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M7 7l10 10-5 4V3l5 4L7 17"/></svg>
+      <div>${scanning?"Scansione in corso… avvicina il beacon.":"Premi <b>Avvia scansione</b> per cercare i beacon vicini."}</div>
+    </div>`;
+    return;
+  }
+
+  listEl.innerHTML = recs.map(rec=>{
+    const holy=looksHoly(rec);
+    const tags=rec.decoded.map(d=>`<span class="tag ${d.type.startsWith('Eddystone-TLM')?'holy':''}">${d.type}</span>`).join(" ");
+    // metrics row (battery/temp/pressure/humidity if decoded)
+    let metrics="";
+    const mset={};
+    rec.decoded.forEach(d=>{ if(d.metrics) Object.assign(mset,d.metrics); });
+    if(rec.txPower!=null) mset.tx = {v:rec.txPower, unit:"dBm", k:"Tx"};
+    const order=[["batt","Batteria"],["temp","Temp"],["press","Pressione"],["hum","Umidità"],["tx","Tx"]];
+    metrics = order.filter(([k])=>mset[k]).map(([k,label])=>{
+      const m=mset[k];
+      return `<div class="metric"><div class="k">${label}</div><div class="v">${m.v}<small> ${m.unit}</small></div></div>`;
+    }).join("");
+
+    // decoded fields
+    let fields="";
+    rec.decoded.forEach(d=>{
+      if(d.fields && Object.keys(d.fields).length){
+        fields += `<div class="kv"><div class="l" style="border:0"><div class="k" style="color:var(--acc)">${d.type}</div><div class="v"></div></div>`;
+        for(const [k,v] of Object.entries(d.fields))
+          fields += `<div class="l"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+        fields += `</div>`;
+      }
+    });
+
+    // raw dumps
+    let raw="";
+    for(const [cid,dv] of rec.mfg){
+      const cn=companyName(cid);
+      raw += `<div class="hex"><span class="lbl">Manufacturer 0x${cid.toString(16).padStart(4,"0")}${cn?` (${cn})`:""}:</span><br>${hex(dv)}</div>`;
+    }
+    for(const [uuid,dv] of rec.svc){
+      raw += `<div class="hex"><span class="lbl">Service ${uuid}:</span><br>${hex(dv)}</div>`;
+    }
+    if(rec.uuids && rec.uuids.length)
+      raw += `<div class="hex"><span class="lbl">Service UUIDs:</span><br>${rec.uuids.join("<br>")}</div>`;
+
+    const age=((Date.now()-rec.seen)/1000).toFixed(0);
+    return `<div class="card ${holy?'holy':''}">
+      <div class="row">
+        <span class="name">${rec.name||"(senza nome)"}</span>
+        ${holy?'<span class="tag holy">HolyIoT?</span>':''}
+      </div>
+      <div class="row" style="margin-top:2px">
+        <span class="rssi">${signalBars(rec.rssi)}${rec.rssi} dBm</span>
+        <span style="flex:1"></span>
+        <span class="rssi">${age}s fa</span>
+      </div>
+      ${rec.address?`<div class="mac">${rec.address}</div>`:""}
+      <div style="margin-top:8px">${tags||'<span class="tag">advertisement</span>'}</div>
+      ${metrics?`<div class="metrics">${metrics}</div>`:""}
+      ${(fields||raw)?`<details><summary>Dati grezzi & decodifica</summary>${fields}${raw}
+        <div class="foot" style="text-align:left;margin-top:8px">
+        Se pressione/temperatura non compaiono tra le metriche, copiami la riga
+        <i>Manufacturer …</i> qui sopra: la mappo sul formato esatto del tuo modello.</div>
+        </details>`:""}
+    </div>`;
+  }).join("");
+}
+
+// ---------- scan ----------
+function onAdv(e){
+  pktCount++;
+  const key = e.device?.id || e.device?.name || Math.random().toString(36);
+  let rec = state.get(key);
+  if(!rec){ rec={mfg:new Map(),svc:new Map(),decoded:[],sensor:false}; state.set(key,rec); }
+  rec.name = e.device?.name || e.name || rec.name || "";
+  rec.rssi = e.rssi ?? rec.rssi;
+  rec.txPower = (e.txPower!=null)?e.txPower:rec.txPower;
+  rec.address = e.device?.id || rec.address;
+  rec.uuids = (e.uuids && e.uuids.length)?e.uuids:rec.uuids;
+  rec.seen = Date.now();
+
+  rec.mfg = e.manufacturerData || rec.mfg;
+  rec.svc = e.serviceData || rec.svc;
+
+  // decode
+  const decoded=[];
+  if(e.manufacturerData){
+    for(const [cid,dv] of e.manufacturerData){
+      const ib=decodeIBeacon(cid,dv); if(ib){decoded.push(ib);continue;}
+      const g=decodeSensorGuess(cid,dv); if(g) rec.sensor=true, rec._guess=g;
+    }
+  }
+  if(e.serviceData){
+    for(const [uuid,dv] of e.serviceData){
+      const u=(""+uuid).toLowerCase();
+      if(u.includes("feaa")){ const ed=decodeEddystone(dv); if(ed) decoded.push(ed); }
+    }
+  }
+  if(decoded.length) rec.decoded=decoded;
+
+  render();
+}
+
+async function toggleScan(){
+  if(scanning){
+    try{ leScan && leScan.stop(); }catch(_){}
+    scanning=false; dotEl.classList.remove("on");
+    $("#scan").textContent="Avvia scansione";
+    return;
+  }
+  if(!navigator.bluetooth){
+    notice("Questo browser non supporta <b>Web Bluetooth</b>. Su Android usa <b>Chrome</b>; su iPhone Safari non è supportato (serve un'app tipo <a href='https://apps.apple.com/app/bluefy/id1492822055'>Bluefy</a> o un'app nativa).","err");
+    return;
+  }
+  if(!navigator.bluetooth.requestLEScan){
+    notice("Lo <b>scan degli advertisement</b> non è attivo. Su Android: apri <code>chrome://flags/#enable-experimental-web-platform-features</code>, abilita e riavvia Chrome.","err");
+    return;
+  }
+  try{
+    notice("");
+    leScan = await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true, keepRepeatedDevices:true});
+    navigator.bluetooth.addEventListener("advertisementreceived", onAdv);
+    scanning=true; dotEl.classList.add("on");
+    $("#scan").textContent="Ferma scansione";
+    render();
+  }catch(err){
+    notice("Scansione non avviata: "+(err && err.message ? err.message : err)+
+      "<br>Verifica che Bluetooth e Localizzazione siano attivi e che il permesso sia concesso.","err");
+  }
+}
+
+$("#scan").addEventListener("click", toggleScan);
+$("#clear").addEventListener("click", ()=>{ state.clear(); pktCount=0; render(); });
+$("#sort").addEventListener("change", render);
+$("#onlyHoly").addEventListener("change", render);
+
+// refresh "age" periodically
+setInterval(()=>{ if(scanning) render(); }, 2000);
+
+// initial capability hint
+if(!navigator.bluetooth){
+  notice("Web Bluetooth non rilevato. Apri questa pagina in <b>Chrome su Android</b> (in HTTPS). iOS/Safari non è supportato.");
+}else if(!navigator.bluetooth.requestLEScan){
+  notice("Il tuo Chrome non espone <code>requestLEScan</code>. Attiva <code>chrome://flags/#enable-experimental-web-platform-features</code> e riavvia.");
+}
+render();
+</script>
+</body>
+</html>

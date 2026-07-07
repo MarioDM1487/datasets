@@ -1,0 +1,17 @@
+{
+  "name": "HolyIoT Beacon Reader",
+  "short_name": "Beacon",
+  "description": "Scanner BLE per beacon HolyIoT: iBeacon, Eddystone TLM (temperatura, batteria) e dati sensore.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%230b1020'/%3E%3Cpath d='M56 56l40 40-20 16V40l20 16-40 40' fill='none' stroke='%235b9dff' stroke-width='9' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
