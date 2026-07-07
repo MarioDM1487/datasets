@@ -262,7 +262,7 @@ function decodeHolyIoT(companyId, dv){
     const hpa = raw/100;
     return {type:"HolyIoT Pressione", metrics:{
         press:{v:hpa.toFixed(1), unit:"hPa"},
-      }, fields:{"Pressione":`${hpa.toFixed(1)} hPa`, "raw":`${raw}`}};
+      }, fields:{"Pressione":`${hpa.toFixed(1)} hPa (${raw} Pa)`}};
   }
   return null;
 }
