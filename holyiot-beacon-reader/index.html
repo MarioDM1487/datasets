@@ -121,7 +121,17 @@
 const $ = s => document.querySelector(s);
 const listEl = $("#list"), noticeEl = $("#notice"), dotEl = $("#dot");
 const state = new Map();        // key(address|name) -> device record
-let pktCount = 0, scanning = false, leScan = null;
+const expanded = new Set();      // device keys whose "raw" section is open
+let pktCount = 0, scanning = false, leScan = null, renderPending = false;
+
+// Coalesce redraws: beacons advertise several times/second, and a full
+// innerHTML rebuild on every packet would wipe the DOM mid-tap (making the
+// "Dati grezzi" section impossible to open). Throttle to ~500ms.
+function scheduleRender(){
+  if(renderPending) return;
+  renderPending = true;
+  setTimeout(()=>{ renderPending = false; render(); }, 500);
+}
 
 const hex = (dv, sep=" ") => {
   const b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
@@ -298,7 +308,7 @@ function render(){
       ${rec.address?`<div class="mac">${rec.address}</div>`:""}
       <div style="margin-top:8px">${tags||'<span class="tag">advertisement</span>'}</div>
       ${metrics?`<div class="metrics">${metrics}</div>`:""}
-      ${(fields||raw)?`<details><summary>Dati grezzi & decodifica</summary>${fields}${raw}
+      ${(fields||raw)?`<details data-key="${rec.key}" ${expanded.has(rec.key)?"open":""}><summary>Dati grezzi & decodifica</summary>${fields}${raw}
         <div class="foot" style="text-align:left;margin-top:8px">
         Se pressione/temperatura non compaiono tra le metriche, copiami la riga
         <i>Manufacturer …</i> qui sopra: la mappo sul formato esatto del tuo modello.</div>
@@ -312,7 +322,7 @@ function onAdv(e){
   pktCount++;
   const key = e.device?.id || e.device?.name || Math.random().toString(36);
   let rec = state.get(key);
-  if(!rec){ rec={mfg:new Map(),svc:new Map(),decoded:[],sensor:false}; state.set(key,rec); }
+  if(!rec){ rec={key,mfg:new Map(),svc:new Map(),decoded:[],sensor:false}; state.set(key,rec); }
   rec.name = e.device?.name || e.name || rec.name || "";
   rec.rssi = e.rssi ?? rec.rssi;
   rec.txPower = (e.txPower!=null)?e.txPower:rec.txPower;
@@ -339,7 +349,7 @@ function onAdv(e){
   }
   if(decoded.length) rec.decoded=decoded;
 
-  render();
+  scheduleRender();
 }
 
 async function toggleScan(){
@@ -371,9 +381,17 @@ async function toggleScan(){
 }
 
 $("#scan").addEventListener("click", toggleScan);
-$("#clear").addEventListener("click", ()=>{ state.clear(); pktCount=0; render(); });
+$("#clear").addEventListener("click", ()=>{ state.clear(); expanded.clear(); pktCount=0; render(); });
 $("#sort").addEventListener("change", render);
 $("#onlyHoly").addEventListener("change", render);
+
+// Remember which cards are expanded across redraws. The `toggle` event does
+// not bubble, so we listen in the capture phase to catch it from any <details>.
+listEl.addEventListener("toggle", e=>{
+  const d=e.target;
+  if(d.tagName!=="DETAILS" || !d.dataset.key) return;
+  if(d.open) expanded.add(d.dataset.key); else expanded.delete(d.dataset.key);
+}, true);
 
 // refresh "age" periodically
 setInterval(()=>{ if(scanning) render(); }, 2000);
