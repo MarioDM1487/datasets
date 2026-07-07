@@ -371,25 +371,24 @@ function onAdv(e){
   rec.uuids = (e.uuids && e.uuids.length)?e.uuids:rec.uuids;
   rec.seen = Date.now();
 
-  rec.mfg = e.manufacturerData || rec.mfg;
-  rec.svc = e.serviceData || rec.svc;
+  // Accumulate every distinct frame: some beacons alternate an identity frame
+  // (iBeacon) with a separate sensor frame. Merging (instead of replacing)
+  // means a sensor frame is never clobbered by the next identity packet.
+  if(e.manufacturerData) for(const [k,v] of e.manufacturerData) rec.mfg.set(k,v);
+  if(e.serviceData)      for(const [k,v] of e.serviceData)      rec.svc.set(k,v);
 
-  // decode
+  // decode across all accumulated frames
   const decoded=[];
-  if(e.manufacturerData){
-    for(const [cid,dv] of e.manufacturerData){
-      const gv=decodeGovee(cid,dv); if(gv){decoded.push(gv); rec.sensor=true; continue;}
-      const ib=decodeIBeacon(cid,dv); if(ib){decoded.push(ib);continue;}
-      const g=decodeSensorGuess(cid,dv); if(g) rec.sensor=true, rec._guess=g;
-    }
+  for(const [cid,dv] of rec.mfg){
+    const gv=decodeGovee(cid,dv); if(gv){decoded.push(gv); rec.sensor=true; continue;}
+    const ib=decodeIBeacon(cid,dv); if(ib){decoded.push(ib); continue;}
+    const g=decodeSensorGuess(cid,dv); if(g){ rec.sensor=true; rec._guess=g; }
   }
-  if(e.serviceData){
-    for(const [uuid,dv] of e.serviceData){
-      const u=(""+uuid).toLowerCase();
-      if(u.includes("feaa")){ const ed=decodeEddystone(dv); if(ed) decoded.push(ed); }
-    }
+  for(const [uuid,dv] of rec.svc){
+    const u=(""+uuid).toLowerCase();
+    if(u.includes("feaa")){ const ed=decodeEddystone(dv); if(ed) decoded.push(ed); }
   }
-  if(decoded.length) rec.decoded=decoded;
+  rec.decoded=decoded;
 
   scheduleRender();
 }
