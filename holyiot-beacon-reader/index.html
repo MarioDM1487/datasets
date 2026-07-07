@@ -325,7 +325,7 @@ function render(){
 
     // raw dumps
     let raw="";
-    for(const [cid,dv] of rec.mfg){
+    for(const {cid,dv} of rec.mfg.values()){
       const cn=companyName(cid);
       raw += `<div class="hex"><span class="lbl">Manufacturer 0x${cid.toString(16).padStart(4,"0")}${cn?` (${cn})`:""}:</span><br>${hexBlock(dv)}</div>`;
     }
@@ -371,15 +371,21 @@ function onAdv(e){
   rec.uuids = (e.uuids && e.uuids.length)?e.uuids:rec.uuids;
   rec.seen = Date.now();
 
-  // Accumulate every distinct frame: some beacons alternate an identity frame
-  // (iBeacon) with a separate sensor frame. Merging (instead of replacing)
-  // means a sensor frame is never clobbered by the next identity packet.
-  if(e.manufacturerData) for(const [k,v] of e.manufacturerData) rec.mfg.set(k,v);
-  if(e.serviceData)      for(const [k,v] of e.serviceData)      rec.svc.set(k,v);
+  // Accumulate every distinct frame. Some beacons (e.g. HolyIoT) send an
+  // identity frame (iBeacon) AND a separate sensor frame under the SAME company
+  // id 0xffff — so keying by company id alone makes one clobber the other. Key
+  // instead by company id + frame shape (iBeacon vs data) so BOTH survive; the
+  // sensor entry updates in place as its readings change.
+  if(e.manufacturerData) for(const [cid,dv] of e.manufacturerData){
+    const b=bytes(dv);
+    const isIB = b.length>=23 && b[0]===0x02 && b[1]===0x15;
+    rec.mfg.set(`${cid}:${isIB?"ib":"data"}`, {cid, dv});
+  }
+  if(e.serviceData) for(const [k,v] of e.serviceData) rec.svc.set(k, v);
 
   // decode across all accumulated frames
   const decoded=[];
-  for(const [cid,dv] of rec.mfg){
+  for(const {cid,dv} of rec.mfg.values()){
     const gv=decodeGovee(cid,dv); if(gv){decoded.push(gv); rec.sensor=true; continue;}
     const ib=decodeIBeacon(cid,dv); if(ib){decoded.push(ib); continue;}
     const g=decodeSensorGuess(cid,dv); if(g){ rec.sensor=true; rec._guess=g; }
