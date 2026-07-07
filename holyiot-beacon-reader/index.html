@@ -237,6 +237,36 @@ function decodeGovee(companyId, dv){
     }, fields:{"Temperatura":`${temp.toFixed(1)} °C`, "Umidità":`${hum.toFixed(1)} %`, "Batteria":`${batt} %`}};
 }
 
+// HolyIoT-25015 sensor frames, broadcast under company id 0xffff alongside the
+// iBeacon identity frame. Two frame types, distinguished by length; byte 0 is a
+// rolling counter. Layout confirmed against the official app:
+//   7 bytes  cc TT TT HH HH tw hw  -> temp int16 BE /10 °C, humidity int16 BE /10 %RH, T/H warn flags
+//   5 bytes  cc PP PP PP xx         -> pressure 24-bit BE / 100 hPa
+function decodeHolyIoT(companyId, dv){
+  if(companyId !== 0xffff) return null;
+  const b = bytes(dv);
+  if(b.length >= 23 && b[0]===0x02 && b[1]===0x15) return null; // iBeacon identity frame
+  const dvv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  if(b.length === 7){
+    const temp = dvv.getInt16(1,false)/10;
+    const hum  = dvv.getInt16(3,false)/10;
+    return {type:"HolyIoT T/H", metrics:{
+        temp:{v:temp.toFixed(1), unit:"°C"},
+        hum:{v:hum.toFixed(1), unit:"%"},
+      }, fields:{"Temperatura":`${temp.toFixed(1)} °C`, "Umidità":`${hum.toFixed(1)} %RH`,
+        "T Warn":b[5]?`0x${b[5].toString(16).padStart(2,"0")}`:"Normal",
+        "H Warn":b[6]?`0x${b[6].toString(16).padStart(2,"0")}`:"Normal"}};
+  }
+  if(b.length === 5){
+    const raw = (b[1]<<16)|(b[2]<<8)|b[3];
+    const hpa = raw/100;
+    return {type:"HolyIoT Pressione", metrics:{
+        press:{v:hpa.toFixed(1), unit:"hPa"},
+      }, fields:{"Pressione":`${hpa.toFixed(1)} hPa`, "raw":`${raw}`}};
+  }
+  return null;
+}
+
 // Best-effort HolyIoT / generic sensor manufacturer-data decoder.
 // HolyIoT sensor beacons pack readings into manufacturer specific data; exact
 // layout varies per model. We surface likely candidates so we can confirm the
@@ -385,7 +415,9 @@ function onAdv(e){
   if(e.manufacturerData) for(const [cid,dv] of e.manufacturerData){
     const b=bytes(dv);
     const isIB = b.length>=23 && b[0]===0x02 && b[1]===0x15;
-    rec.mfg.set(`${cid}:${isIB?"ib":"data"}`, {cid, dv});
+    // Key by frame length so distinct data frames (e.g. HolyIoT's 7-byte
+    // temp/humidity and 5-byte pressure) are kept side by side, not clobbered.
+    rec.mfg.set(`${cid}:${isIB?"ib":"d"+b.length}`, {cid, dv});
   }
   if(e.serviceData) for(const [k,v] of e.serviceData) rec.svc.set(k, v);
 
@@ -393,6 +425,7 @@ function onAdv(e){
   const decoded=[];
   for(const {cid,dv} of rec.mfg.values()){
     const gv=decodeGovee(cid,dv); if(gv){decoded.push(gv); rec.sensor=true; continue;}
+    const hy=decodeHolyIoT(cid,dv); if(hy){decoded.push(hy); rec.sensor=true; continue;}
     const ib=decodeIBeacon(cid,dv); if(ib){decoded.push(ib); continue;}
     const g=decodeSensorGuess(cid,dv); if(g){ rec.sensor=true; rec._guess=g; }
   }
