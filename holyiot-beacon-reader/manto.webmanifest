@@ -1,0 +1,17 @@
+{
+  "name": "Manto — Comfort Cavallo",
+  "short_name": "Manto",
+  "description": "Monitoraggio del comfort termico del cavallo sotto coperta riscaldante.",
+  "start_url": "manto.html",
+  "display": "standalone",
+  "background_color": "#1b1512",
+  "theme_color": "#1b1512",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%231b1512'/%3E%3Ctext x='96' y='128' font-size='104' text-anchor='middle' font-family='Georgia,serif' fill='%23c9727f'%3EM%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
