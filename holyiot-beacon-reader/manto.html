@@ -306,8 +306,8 @@ function renderHome(){
       ${c.sev==="cold"?`<div class="alarm cold">🔵 Troppo freddo — coperta insufficiente</div>`:""}
     </div>
     <div class="tiles">
-      <div class="tile"><div class="k">Sotto coperta</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div><div class="s">${r.uH!=null?"umidità "+r.uH.toFixed(0)+"%":"aggiornato "+timeAgo(r.uSeen)}</div></div>
-      <div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div><div class="s">${r.eT!=null?"aggiornato "+timeAgo(r.eSeen):"nessun sensore esterno"}</div></div>
+      <div class="tile"><div class="k">Sotto coperta</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div><div class="s">${(r.uH!=null?"umidità "+r.uH.toFixed(0)+"% · ":"")+timeAgo(r.uSeen)}</div></div>
+      <div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div><div class="s">${r.eT!=null?timeAgo(r.eSeen):"nessun sensore esterno"}</div></div>
       <div class="tile"><div class="k">Δ isolamento</div><div class="v">${delta!=null?(delta>=0?"+":"")+delta.toFixed(1):"—"}<small>°C</small></div><div class="s">efficacia coperta</div></div>
       <div class="tile"><div class="k">Umidità pelo</div><div class="v">${r.uH!=null?r.uH.toFixed(0):"—"}<small>%</small></div><div class="s">${r.uH!=null&&r.uH>=TH.humSweat?"alta · sudore":"nella norma"}</div></div>
     </div>`;
