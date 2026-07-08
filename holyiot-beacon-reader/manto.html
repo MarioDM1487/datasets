@@ -224,7 +224,7 @@ function decodeHolyIoT(cid,dv){
 
 /* ---------- live sensor state ---------- */
 const live=new Map();
-let scanning=false, leScan=null;
+let scanning=false, leScan=null, scanStarted=false, needGesture=false;
 function ingest(ev){
   const id=ev.device?.id||ev.device?.name||"?";
   let r=live.get(id); if(!r){ r={id,name:ev.device?.name||"Sensore",temp:null,hum:null,press:null}; live.set(id,r); }
@@ -287,6 +287,10 @@ function renderHome(){
     inner=`<div class="card q"><div class="idrow"><div class="av">🐎</div><div><div class="nm">${h.name}</div><div class="mt">${h.blanket||"coperta non impostata"}</div></div></div>
       <p class="sub" style="margin-top:12px">Abbina i sensori di ${h.name}: quello <b>sotto la coperta</b> e quello <b>esterno</b>.</p>
       <button class="btn" style="margin-top:12px" onclick="go('sensori')">Abbina i sensori</button></div>`;
+  } else if(!scanning){
+    inner=`<div class="card"><div class="idrow"><div class="av">🐎</div><div><div class="nm">${h.name}</div><div class="mt">${h.blanket||""}</div></div></div>
+      <p class="sub" style="margin-top:12px">Monitoraggio in pausa. Avvialo per leggere in continuo i sensori abbinati e vedere la temperatura di ${h.name}.</p>
+      <button class="btn" style="margin-top:12px" onclick="startScan(false)">▶ Avvia monitoraggio</button></div>`;
   } else if(!c){
     inner=`<div class="card"><div class="idrow"><div class="av">🐎</div><div><div class="nm">${h.name}</div><div class="mt">${h.blanket||""}</div></div></div>
       <p class="sub" style="margin-top:12px">In attesa di dati dal sensore sotto coperta… assicurati che sia acceso e vicino, e che la scansione sia attiva.</p>
@@ -401,7 +405,7 @@ function renderSensori(){
   const roleName=id=>h.roles.under===id?"under":h.roles.ext===id?"ext":null;
   el.innerHTML=horseSelector()+`<h2 class="t">Sensori di ${h.name}</h2>
     <div class="notice">Assegna <b>Sotto coperta</b> al sensore indossato e <b>Esterno</b> al gemello (uno per coperta). ${!navigator.bluetooth?"⚠️ Web Bluetooth non disponibile in questo browser.":""}</div>
-    <button class="btn ${scanning?"ghost":""}" onclick="toggleScan()">${scanning?"Ferma scansione":"🔍 Cerca sensori"}</button>
+    <button class="btn ${scanning?"ghost":""}" onclick="toggleScan()">${scanning?"⏸ Ferma monitoraggio":"🔍 Avvia monitoraggio / cerca"}</button>
     <div class="sec">Sensori rilevati</div>
     ${list.length?list.map(d=>{const rn=roleName(d.id);return `<div class="dev">
       <div class="rd">📡</div>
@@ -450,22 +454,39 @@ document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",(
 
 /* ---------- BLE scan ---------- */
 function notice(html,cls=""){ $("#notice").innerHTML=html?`<div class="notice ${cls}">${html}</div>`:""; }
-function updateLive(){ $("#live").classList.toggle("on",scanning); $("#liveTxt").textContent=scanning?"in ascolto":"non attivo"; }
-window.toggleScan=async()=>{
-  if(scanning){ try{leScan&&leScan.stop();}catch(_){} scanning=false; updateLive(); render[cur](); return; }
+function updateLive(){ $("#live").classList.toggle("on",scanning); $("#liveTxt").textContent=scanning?"monitoraggio attivo":"in pausa"; }
+const hasSensors=()=>horses.some(h=>h.roles&&h.roles.under);
+
+// Monitoring = the LE scan. Once sensors are paired it must stay active across
+// pages (independent of the "cerca sensori" discovery), so paired sensors keep
+// updating the horse. Web Bluetooth needs a user gesture to (re)start a scan,
+// so we try to auto-start and fall back to a Home button if a tap is required.
+async function startScan(silent){
+  if(scanning) return true;
   if(!navigator.bluetooth||!navigator.bluetooth.requestLEScan){
-    notice("Per leggere i sensori serve <b>Chrome su Android</b> con il flag <code>chrome://flags/#enable-experimental-web-platform-features</code> attivo, e la pagina in HTTPS.","err"); return; }
-  try{ notice("");
+    if(!silent) notice("Per leggere i sensori serve <b>Chrome su Android</b> con il flag <code>chrome://flags/#enable-experimental-web-platform-features</code> attivo, e la pagina in HTTPS.","err");
+    return false; }
+  try{
     leScan=await navigator.bluetooth.requestLEScan({acceptAllAdvertisements:true,keepRepeatedDevices:true});
-    navigator.bluetooth.addEventListener("advertisementreceived",ingest);
-    scanning=true; updateLive(); render[cur]();
-  }catch(err){ notice("Scansione non avviata: "+(err?.message||err)+"<br>Attiva Bluetooth e Localizzazione e concedi il permesso.","err"); }
-};
+    if(!scanStarted){ navigator.bluetooth.addEventListener("advertisementreceived",ingest); scanStarted=true; }
+    scanning=true; needGesture=false; notice(""); updateLive(); render[cur](); return true;
+  }catch(err){
+    if(silent){ needGesture=true; }
+    else notice("Monitoraggio non avviato: "+(err?.message||err)+"<br>Attiva Bluetooth e Localizzazione e concedi il permesso.","err");
+    updateLive(); render[cur](); return false;
+  }
+}
+function stopScan(){ try{leScan&&leScan.stop();}catch(_){} scanning=false; updateLive(); render[cur](); }
+window.toggleScan=()=>scanning?stopScan():startScan(false);
+$("#live").parentElement.style.cursor="pointer";
+$(".live").addEventListener("click",()=>toggleScan());
 
 setInterval(()=>{ if(scanning && cur==="home") renderHome(); },5000);
 
 if(!navigator.bluetooth) notice("Apri Manto in <b>Chrome su Android</b> (in HTTPS) per leggere i sensori. Su iPhone il web non accede al Bluetooth — arriverà con l'app nativa.");
 go("home");
+// auto-start monitoring if sensors are already paired
+if(hasSensors()) startScan(true);
 </script>
 </body>
 </html>
