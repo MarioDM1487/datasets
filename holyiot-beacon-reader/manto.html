@@ -103,6 +103,10 @@
   .rolebtns{display:flex;gap:6px}
   .rb{font-size:11px;font-weight:700;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)}
   .rb.on{border-color:var(--accent);color:#fff;background:var(--accent)}
+  .dev.hl{border-color:var(--ideal);box-shadow:0 0 0 2px color-mix(in srgb,var(--ideal) 30%,transparent)}
+  .badge{font-size:10px;font-weight:800;padding:3px 7px;border-radius:7px;margin-left:6px;white-space:nowrap;vertical-align:1px}
+  .badge.near{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold)}
+  .badge.blow{background:color-mix(in srgb,var(--ideal) 22%,transparent);color:var(--ideal)}
 
   .hcard{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);
     border-radius:16px;padding:13px;margin-bottom:10px}
@@ -231,7 +235,19 @@ function ingest(ev){
   r.name=ev.device?.name||r.name; r.rssi=ev.rssi??r.rssi; r.seen=Date.now();
   if(ev.manufacturerData) for(const [cid,dv] of ev.manufacturerData){
     const h=decodeHolyIoT(cid,dv);
-    if(h){ if(h.temp!=null){r.temp=h.temp;r.hum=h.hum;} if(h.press!=null)r.press=h.press; }
+    if(h){
+      if(h.temp!=null){
+        r.temp=h.temp;
+        if(h.hum!=null){
+          // "soffio per identificare": a breath spikes humidity vs a slow baseline
+          if(r.humAvg==null) r.humAvg=h.hum;
+          if(h.hum - r.humAvg > 10) r.idUntil=Date.now()+4000;
+          r.humAvg=r.humAvg*0.85 + h.hum*0.15;
+          r.hum=h.hum;
+        }
+      }
+      if(h.press!=null)r.press=h.press;
+    }
   }
   sampleAll();
   if(cur==="home") renderHome();
@@ -401,15 +417,21 @@ function renderScheda(){
 
 function renderSensori(){
   const el=$("#v-sensori"); const h=activeHorse();
+  const now=Date.now();
   const list=[...live.values()].filter(d=>d.temp!=null).sort((a,b)=>(b.rssi??-999)-(a.rssi??-999));
+  const maxRssi=list.length?Math.max(...list.map(d=>d.rssi??-999)):-999;
   const roleName=id=>h.roles.under===id?"under":h.roles.ext===id?"ext":null;
   el.innerHTML=horseSelector()+`<h2 class="t">Sensori di ${h.name}</h2>
-    <div class="notice">Assegna <b>Sotto coperta</b> al sensore indossato e <b>Esterno</b> al gemello (uno per coperta). ${!navigator.bluetooth?"⚠️ Web Bluetooth non disponibile in questo browser.":""}</div>
+    <div class="notice">Non sai quale sensore è quale? <b>Avvicina</b> un sensore al telefono (compare 📍 <b>più vicino</b>) oppure <b>soffiaci sopra</b> 2″ (compare 🌬️ <b>questo!</b>). Poi assegna <b>Sotto coperta</b> o <b>Esterno</b>. ${!navigator.bluetooth?"⚠️ Web Bluetooth non disponibile in questo browser.":""}</div>
     <button class="btn ${scanning?"ghost":""}" onclick="toggleScan()">${scanning?"⏸ Ferma monitoraggio":"🔍 Avvia monitoraggio / cerca"}</button>
-    <div class="sec">Sensori rilevati</div>
-    ${list.length?list.map(d=>{const rn=roleName(d.id);return `<div class="dev">
+    <div class="sec">Sensori rilevati (${list.length})</div>
+    ${list.length?list.map(d=>{const rn=roleName(d.id);
+      const blown=d.idUntil&&d.idUntil>now;
+      const near=!blown && d.rssi===maxRssi && d.rssi>-52;
+      const badge=blown?`<span class="badge blow">🌬️ questo!</span>`:near?`<span class="badge near">📍 più vicino</span>`:"";
+      return `<div class="dev ${blown?"hl":""}">
       <div class="rd">📡</div>
-      <div class="sp"><div class="nm">${d.name}</div><div class="mt">${d.temp.toFixed(1)}°C · ${d.rssi??"?"} dBm · ${timeAgo(d.seen)}</div></div>
+      <div class="sp"><div class="nm">${d.name}${badge}</div><div class="mt">${d.temp.toFixed(1)}°C · umidità ${d.hum!=null?d.hum.toFixed(0)+"%":"—"} · ${d.rssi??"?"} dBm · ${timeAgo(d.seen)}</div></div>
       <div class="rolebtns">
         <button class="rb ${rn==="under"?"on":""}" onclick="assign('under','${d.id}')">Sotto</button>
         <button class="rb ${rn==="ext"?"on":""}" onclick="assign('ext','${d.id}')">Esterno</button>
@@ -481,7 +503,7 @@ window.toggleScan=()=>scanning?stopScan():startScan(false);
 $("#live").parentElement.style.cursor="pointer";
 $(".live").addEventListener("click",()=>toggleScan());
 
-setInterval(()=>{ if(scanning && cur==="home") renderHome(); },5000);
+setInterval(()=>{ if(scanning && cur==="home") renderHome(); if(scanning && cur==="sensori") renderSensori(); },3000);
 
 if(!navigator.bluetooth) notice("Apri Manto in <b>Chrome su Android</b> (in HTTPS) per leggere i sensori. Su iPhone il web non accede al Bluetooth — arriverà con l'app nativa.");
 go("home");
