@@ -249,6 +249,14 @@ function ingest(ev){
       if(h.press!=null)r.press=h.press;
     }
   }
+  // Web Bluetooth hides the hardware MAC, but the HolyIoT embeds it in its
+  // Device Information (0x180A) service data: [counter][MAC 6 bytes][...].
+  if(ev.serviceData) for(const [uuid,dv] of ev.serviceData){
+    if((""+uuid).toLowerCase().includes("180a")){
+      const b=bytesOf(dv);
+      if(b.length>=7) r.mac=[1,2,3,4,5,6].map(i=>b[i].toString(16).padStart(2,"0")).join(":").toUpperCase();
+    }
+  }
   sampleAll();
   if(cur==="home") renderHome();
   if(cur==="sensori") renderSensori();
@@ -431,14 +439,14 @@ function renderSensori(){
       const badge=blown?`<span class="badge blow">🌬️ questo!</span>`:near?`<span class="badge near">📍 più vicino</span>`:"";
       return `<div class="dev ${blown?"hl":""}">
       <div class="rd">📡</div>
-      <div class="sp"><div class="nm">${d.name}${badge}</div><div class="mt">${d.temp.toFixed(1)}°C · umidità ${d.hum!=null?d.hum.toFixed(0)+"%":"—"} · ${d.rssi??"?"} dBm · ${timeAgo(d.seen)}</div></div>
+      <div class="sp"><div class="nm">${d.mac||d.name}${badge}</div><div class="mt">${d.mac?d.name+" · ":""}${d.temp.toFixed(1)}°C · umidità ${d.hum!=null?d.hum.toFixed(0)+"%":"—"} · ${d.rssi??"?"} dBm</div></div>
       <div class="rolebtns">
         <button class="rb ${rn==="under"?"on":""}" onclick="assign('under','${d.id}')">Sotto</button>
         <button class="rb ${rn==="ext"?"on":""}" onclick="assign('ext','${d.id}')">Esterno</button>
       </div></div>`;}).join("")
     :`<div class="card"><p class="sub">${scanning?"Scansione in corso… avvicina i sensori.":"Premi «Cerca sensori» per iniziare."}</p></div>`}
     <div class="sec">Abbinati a ${h.name}</div>
-    <div class="card q"><p class="sub">Sotto coperta: <b>${h.roles.under?(live.get(h.roles.under)?.name||h.roles.under):"—"}</b><br>Esterno: <b>${h.roles.ext?(live.get(h.roles.ext)?.name||h.roles.ext):"—"}</b></p></div>`;
+    <div class="card q"><p class="sub">Sotto coperta: <b>${h.roles.under?(live.get(h.roles.under)?.mac||live.get(h.roles.under)?.name||h.roles.under):"—"}</b><br>Esterno: <b>${h.roles.ext?(live.get(h.roles.ext)?.mac||live.get(h.roles.ext)?.name||h.roles.ext):"—"}</b></p></div>`;
 }
 
 /* ---------- actions ---------- */
