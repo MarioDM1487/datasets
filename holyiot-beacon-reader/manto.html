@@ -190,28 +190,31 @@ const activeHorse=()=>horses.find(h=>h.id===activeId)||horses[0];
 const histOf=id=>historyMap[id]||(historyMap[id]=[]);
 const alertsOf=id=>alertsMap[id]||(alertsMap[id]=[]);
 
-/* ---------- comfort thresholds (indicative, tune with a vet) ---------- */
-const TH={ freddo:14, fresco:18, ideale:28, caldo:32, humSweat:82 };
+/* ---------- comfort thresholds (indicative, tune with a vet) ----------
+   Il comfort dipende dal Δ = interno (sotto coperta) − esterno, non dalla
+   temperatura assoluta: la coperta deve tenere l'animale più caldo dell'esterno
+   della giusta differenza. Ideale 5–10°C; oltre 10°C con umidità alta = sudore. */
+const TH={ dFreddo:2, dFresco:5, dIdeale:10, dCaldo:13, humSweat:80 };
 function comfort(uT,uH,eT){
-  if(uT==null) return null;
+  if(uT==null||eT==null) return null;      // serve sia interno che esterno
+  const d=uT-eT;
   let key;
-  if(uH!=null && uH>=TH.humSweat) key="sudore";
-  else if(uT>TH.caldo) key="sudore";
-  else if(uT>=TH.ideale) key="caldo";
-  else if(uT>=TH.fresco) key="ideale";
-  else if(uT>=TH.freddo) key="fresco";
+  if(d>TH.dCaldo || (d>TH.dIdeale && uH!=null && uH>=TH.humSweat)) key="sudore";
+  else if(d>TH.dIdeale) key="caldo";
+  else if(d>=TH.dFresco) key="ideale";
+  else if(d>=TH.dFreddo) key="fresco";
   else key="freddo";
   const meta={
-    freddo:{label:"Troppo freddo",color:"var(--cold)",sev:"cold",msg:"La coperta non basta: l'animale sta perdendo calore."},
-    fresco:{label:"Fresco",color:"var(--cold)",sev:"info",msg:"Un po' fresco. Tieni d'occhio l'andamento."},
-    ideale:{label:"Al caldo",color:"var(--ideal)",sev:"ok",msg:"Comfort ottimale: la coperta mantiene il calore giusto."},
-    caldo:{label:"Si scalda",color:"var(--warn)",sev:"warn",msg:"Sta diventando troppo caldo sotto la coperta."},
-    sudore:{label:"Sudorazione",color:"var(--hot)",sev:"hot",msg:"Rischio sudore: poi il sudore raffredda l'animale."},
+    freddo:{label:"Troppo freddo",color:"var(--cold)",sev:"cold",msg:"La coperta non scalda abbastanza: l'animale resta freddo."},
+    fresco:{label:"Fresco",color:"var(--cold)",sev:"info",msg:"Isolamento un po' scarso. Tieni d'occhio l'andamento."},
+    ideale:{label:"Al caldo",color:"var(--ideal)",sev:"ok",msg:"Comfort ottimale: la coperta mantiene la differenza giusta."},
+    caldo:{label:"Si scalda",color:"var(--warn)",sev:"warn",msg:"Si scalda troppo rispetto all'esterno."},
+    sudore:{label:"Sudorazione",color:"var(--hot)",sev:"hot",msg:"Rischio sudore: differenza eccessiva, poi il sudore raffredda l'animale."},
   }[key];
-  let pos=(uT-8)/(36-8)*100;
-  if(key==="sudore" && uT<=TH.caldo) pos=88;
+  let pos=d/16*100;
+  if(key==="sudore" && d<=TH.dCaldo) pos=90;   // spinto dall'umidità
   pos=Math.max(3,Math.min(97,pos));
-  return {key,pos,...meta};
+  return {key,pos,delta:d,...meta};
 }
 
 /* ---------- BLE decode ---------- */
@@ -316,9 +319,14 @@ function renderHome(){
       <p class="sub" style="margin-top:12px">Monitoraggio in pausa. Avvialo per leggere in continuo i sensori abbinati e vedere la temperatura di ${h.name}.</p>
       <button class="btn" style="margin-top:12px" onclick="startScan(false)">▶ Avvia monitoraggio</button></div>`;
   } else if(!c){
+    let m;
+    if(r.uT==null) m="In attesa di dati dal sensore <b>interno</b> (sotto coperta). Assicurati che sia acceso e vicino.";
+    else if(!h.roles.ext) m="Manca il sensore <b>esterno</b>: serve per calcolare il Δ e il comfort. Assegnalo dai Sensori.";
+    else m="In attesa di dati dal sensore <b>esterno</b>. Assicurati che sia acceso e vicino.";
     inner=`<div class="card"><div class="idrow"><div class="av">🐎</div><div><div class="nm">${h.name}</div><div class="mt">${h.blanket||""}</div></div></div>
-      <p class="sub" style="margin-top:12px">In attesa di dati dal sensore sotto coperta… assicurati che sia acceso e vicino, e che la scansione sia attiva.</p>
-      <button class="btn ghost sm" style="margin-top:10px" onclick="toggleScan()">${scanning?"Scansione attiva":"Avvia scansione"}</button></div>`;
+      <p class="sub" style="margin-top:12px">${m}</p>
+      ${!h.roles.ext?`<button class="btn sm" style="margin-top:10px" onclick="go('sensori')">Vai ai Sensori</button>`:""}
+      ${r.uT!=null?`<div class="tiles" style="margin-top:12px"><div class="tile"><div class="k">Interno</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div></div><div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div></div></div>`:""}</div>`;
   } else {
     inner=`<div class="card">
       <div class="idrow"><div class="av">🐎</div>
@@ -334,7 +342,7 @@ function renderHome(){
       ${c.sev==="cold"?`<div class="alarm cold">🔵 Troppo freddo — coperta insufficiente</div>`:""}
     </div>
     <div class="tiles">
-      <div class="tile"><div class="k">Sotto coperta</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div><div class="s">${(r.uH!=null?"umidità "+r.uH.toFixed(0)+"% · ":"")+timeAgo(r.uSeen)}</div></div>
+      <div class="tile"><div class="k">Interno</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div><div class="s">${(r.uH!=null?"umidità "+r.uH.toFixed(0)+"% · ":"")+timeAgo(r.uSeen)}</div></div>
       <div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div><div class="s">${r.eT!=null?timeAgo(r.eSeen):"nessun sensore esterno"}</div></div>
       <div class="tile"><div class="k">Δ isolamento</div><div class="v">${delta!=null?(delta>=0?"+":"")+delta.toFixed(1):"—"}<small>°C</small></div><div class="s">efficacia coperta</div></div>
       <div class="tile"><div class="k">Umidità pelo</div><div class="v">${r.uH!=null?r.uH.toFixed(0):"—"}<small>%</small></div><div class="s">${r.uH!=null&&r.uH>=TH.humSweat?"alta · sudore":"nella norma"}</div></div>
@@ -352,21 +360,19 @@ function chartSVG(pts){
   const x=i=>pad+i*(W-2*pad)/(pts.length-1);
   const y=v=>H-pad-(v-lo)/(hi-lo)*(H-2*pad);
   const line=(key,col,w)=>{let d="",started=false;pts.forEach((p,i)=>{if(p[key]==null){started=false;return;}d+=(started?"L":"M")+x(i).toFixed(1)+" "+y(p[key]).toFixed(1)+" ";started=true;});return `<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round"/>`;};
-  const bT=y(TH.ideale),bB=y(TH.fresco);
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <rect x="${pad}" y="${bT.toFixed(1)}" width="${W-2*pad}" height="${Math.max(0,bB-bT).toFixed(1)}" fill="color-mix(in srgb,var(--ideal) 15%,transparent)"/>
     ${line("eT","var(--cold)",2.2)}${line("uT","var(--accent)",2.6)}</svg>`;
 }
 function renderStorico(){
   const el=$("#v-storico"); const h=activeHorse();
   const pts=histOf(h.id).slice(-120);
-  let inband=0; pts.forEach(p=>{ if(p.uT>=TH.fresco&&p.uT<=TH.ideale) inband++; });
+  let inband=0; pts.forEach(p=>{ if(p.eT!=null){const dd=p.uT-p.eT; if(dd>=TH.dFresco&&dd<=TH.dIdeale) inband++;} });
   const pct=pts.length?Math.round(inband/pts.length*100):0;
   const deltas=pts.filter(p=>p.uT!=null&&p.eT!=null).map(p=>p.uT-p.eT);
   const avgD=deltas.length?(deltas.reduce((a,b)=>a+b,0)/deltas.length):null;
   el.innerHTML=horseSelector()+`<h2 class="t">Storico · ${h.name}</h2>
     <div class="card">${chartSVG(pts)}
-      <div class="bl" style="margin-top:10px"><span style="color:var(--accent)">● Sotto coperta</span><span style="color:var(--cold)">● Esterno</span><span style="color:var(--ideal)">▬ Banda ideale</span></div></div>
+      <div class="bl" style="margin-top:10px"><span style="color:var(--accent)">● Interno</span><span style="color:var(--cold)">● Esterno</span><span>Δ ideale 5–10°</span></div></div>
     <div class="tiles">
       <div class="tile plain"><div class="k">Δ medio</div><div class="v">${avgD!=null?(avgD>=0?"+":"")+avgD.toFixed(1):"—"}<small>°C</small></div><div class="s">isolamento medio</div></div>
       <div class="tile plain"><div class="k">In comfort</div><div class="v">${pct}<small>%</small></div><div class="s">${pts.length} campioni</div></div>
@@ -401,6 +407,10 @@ function renderScheda(){
         <label class="f">Coperta</label><input class="f" id="h-blanket" value="${h.blanket||""}">
         <label class="f">Box / scuderia</label><input class="f" id="h-box" value="${h.box||""}">
         <label class="f">Note</label><input class="f" id="h-notes" value="${h.notes||""}">
+        <div class="sec" style="margin-left:0">Sensori abbinati</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="sub" style="flex:1">🩺 Interno (sotto coperta): <b>${h.roles&&h.roles.under?(live.get(h.roles.under)?.mac||live.get(h.roles.under)?.name||h.roles.under):"— non assegnato"}</b></span>${h.roles&&h.roles.under?`<button class="rb" onclick="unassignHorse('${h.id}','under')">Scollega</button>`:""}</div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="sub" style="flex:1">🌡️ Esterno: <b>${h.roles&&h.roles.ext?(live.get(h.roles.ext)?.mac||live.get(h.roles.ext)?.name||h.roles.ext):"— non assegnato"}</b></span>${h.roles&&h.roles.ext?`<button class="rb" onclick="unassignHorse('${h.id}','ext')">Scollega</button>`:""}</div>
+        <p class="sub" style="margin-top:8px">Per assegnare o cambiare i sensori usa il tab <b>Sensori</b> (avvicina o soffia per riconoscerli).</p>
         <button class="btn" style="margin-top:14px" onclick="saveHorse()">Salva</button>
         <button class="btn ghost sm" style="margin-top:8px" onclick="cancelEdit()">Annulla</button>
         ${editing!=="new"&&horses.length>1?`<button class="btn danger sm" style="margin-top:8px" onclick="deleteHorse('${editing}')">Elimina cavallo</button>`:""}
@@ -441,12 +451,15 @@ function renderSensori(){
       <div class="rd">📡</div>
       <div class="sp"><div class="nm">${d.mac||d.name}${badge}</div><div class="mt">${d.mac?d.name+" · ":""}${d.temp.toFixed(1)}°C · umidità ${d.hum!=null?d.hum.toFixed(0)+"%":"—"} · ${d.rssi??"?"} dBm</div></div>
       <div class="rolebtns">
-        <button class="rb ${rn==="under"?"on":""}" onclick="assign('under','${d.id}')">Sotto</button>
+        <button class="rb ${rn==="under"?"on":""}" onclick="assign('under','${d.id}')">Interno</button>
         <button class="rb ${rn==="ext"?"on":""}" onclick="assign('ext','${d.id}')">Esterno</button>
       </div></div>`;}).join("")
     :`<div class="card"><p class="sub">${scanning?"Scansione in corso… avvicina i sensori.":"Premi «Cerca sensori» per iniziare."}</p></div>`}
     <div class="sec">Abbinati a ${h.name}</div>
-    <div class="card q"><p class="sub">Sotto coperta: <b>${h.roles.under?(live.get(h.roles.under)?.mac||live.get(h.roles.under)?.name||h.roles.under):"—"}</b><br>Esterno: <b>${h.roles.ext?(live.get(h.roles.ext)?.mac||live.get(h.roles.ext)?.name||h.roles.ext):"—"}</b></p></div>`;
+    <div class="card q">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="sub" style="flex:1">🩺 Interno: <b>${h.roles.under?(live.get(h.roles.under)?.mac||live.get(h.roles.under)?.name||h.roles.under):"—"}</b></span>${h.roles.under?`<button class="rb" onclick="unassignHorse('${h.id}','under')">Scollega</button>`:""}</div>
+      <div style="display:flex;align-items:center;gap:8px"><span class="sub" style="flex:1">🌡️ Esterno: <b>${h.roles.ext?(live.get(h.roles.ext)?.mac||live.get(h.roles.ext)?.name||h.roles.ext):"—"}</b></span>${h.roles.ext?`<button class="rb" onclick="unassignHorse('${h.id}','ext')">Scollega</button>`:""}</div>
+    </div>`;
 }
 
 /* ---------- actions ---------- */
@@ -470,6 +483,8 @@ window.assign=(role,id)=>{ const h=activeHorse(); if(h.roles[role]===id) delete 
   else{ h.roles[role]=id; const o=role==="under"?"ext":"under"; if(h.roles[o]===id) delete h.roles[o]; }
   store.set("horses",horses); renderSensori(); };
 window.clearAlerts=()=>{ alertsMap[activeId]=[]; store.set("alerts_v2",alertsMap); renderAvvisi(); };
+window.unassignHorse=(id,role)=>{ const h=horses.find(x=>x.id===id); if(h&&h.roles){ delete h.roles[role]; store.set("horses",horses); }
+  render[cur](); };
 
 /* ---------- router ---------- */
 let cur="home";
