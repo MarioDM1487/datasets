@@ -7,6 +7,7 @@
 <title>TEPORE</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%231b1512'/%3E%3Ctext x='96' y='134' font-size='118' text-anchor='middle' font-family='Georgia,serif' fill='%23c69a4a'%3ET%3C/text%3E%3C/svg%3E" />
 <link rel="manifest" href="tepore.webmanifest" />
+<!--NATIVE_BLE-->
 <style>
   :root{
     --bg:#ece3d2; --bg2:#e3d7c0; --surface:#fbf5ea; --surface2:#f1e7d5;
@@ -233,6 +234,9 @@ function decodeHolyIoT(cid,dv){
 /* ---------- live sensor state ---------- */
 const live=new Map();
 let scanning=false, leScan=null, scanStarted=false, needGesture=false;
+// On the Capacitor Android build, native-ble.js sets window.TeporeBLE and BLE
+// reads come from the native plugin; on the web we use Web Bluetooth.
+const NATIVE=!!(window.TeporeBLE);
 function ingest(ev){
   const id=ev.device?.id||ev.device?.name||"?";
   let r=live.get(id); if(!r){ r={id,name:ev.device?.name||"Sensore",temp:null,hum:null,press:null}; live.set(id,r); }
@@ -509,6 +513,15 @@ const hasSensors=()=>horses.some(h=>h.roles&&h.roles.under);
 // so we try to auto-start and fall back to a Home button if a tap is required.
 async function startScan(silent){
   if(scanning) return true;
+  if(NATIVE){
+    try{
+      await window.TeporeBLE.start(ingest);
+      scanning=true; needGesture=false; notice(""); updateLive(); render[cur](); return true;
+    }catch(err){
+      if(!silent) notice("Bluetooth non avviato: "+(err?.message||err)+"<br>Attiva il Bluetooth e concedi i permessi all'app.","err");
+      updateLive(); render[cur](); return false;
+    }
+  }
   if(!navigator.bluetooth||!navigator.bluetooth.requestLEScan){
     if(!silent) notice("Per leggere i sensori serve <b>Chrome su Android</b> con il flag <code>chrome://flags/#enable-experimental-web-platform-features</code> attivo, e la pagina in HTTPS.","err");
     return false; }
@@ -522,14 +535,14 @@ async function startScan(silent){
     updateLive(); render[cur](); return false;
   }
 }
-function stopScan(){ try{leScan&&leScan.stop();}catch(_){} scanning=false; updateLive(); render[cur](); }
+function stopScan(){ if(NATIVE){ try{window.TeporeBLE.stop();}catch(_){} } else { try{leScan&&leScan.stop();}catch(_){} } scanning=false; updateLive(); render[cur](); }
 window.toggleScan=()=>scanning?stopScan():startScan(false);
 $("#live").parentElement.style.cursor="pointer";
 $(".live").addEventListener("click",()=>toggleScan());
 
 setInterval(()=>{ if(scanning && cur==="home") renderHome(); if(scanning && cur==="sensori") renderSensori(); },3000);
 
-if(!navigator.bluetooth) notice("Apri Tepore in <b>Chrome su Android</b> (in HTTPS) per leggere i sensori. Su iPhone il web non accede al Bluetooth — arriverà con l'app nativa.");
+if(!NATIVE && !navigator.bluetooth) notice("Apri Tepore in <b>Chrome su Android</b> (in HTTPS) per leggere i sensori. Su iPhone il web non accede al Bluetooth — arriverà con l'app nativa.");
 go("home");
 // auto-start monitoring if sensors are already paired
 if(hasSensors()) startScan(true);
