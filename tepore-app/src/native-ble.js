@@ -9,7 +9,12 @@ function toMap(o){ const m = new Map(); if(o) for(const k in o) m.set(k, o[k]); 
 
 window.TeporeBLE = {
   async start(onAdv){
-    await BleClient.initialize({ androidNeverForLocation: true });
+    // Default init: the plugin requests the correct permissions per Android
+    // version (BLUETOOTH_SCAN/CONNECT on 12+, location on older). Do NOT use
+    // androidNeverForLocation unless the manifest carries the neverForLocation
+    // flag, or scanning silently returns nothing on older devices.
+    await BleClient.initialize();
+    try { if (!(await BleClient.isEnabled())) await BleClient.requestEnable(); } catch (_) {}
     await BleClient.requestLEScan({ allowDuplicates: true }, (res) => {
       onAdv({
         device: { id: res.device && res.device.deviceId, name: res.localName || (res.device && res.device.name) },

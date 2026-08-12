@@ -237,7 +237,11 @@ let scanning=false, leScan=null, scanStarted=false, needGesture=false;
 // On the Capacitor Android build, native-ble.js sets window.TeporeBLE and BLE
 // reads come from the native plugin; on the web we use Web Bluetooth.
 const NATIVE=!!(window.TeporeBLE);
+let rawCount=0, lastMfgKeys=null, lastSvcKeys=null;   // diagnostica scansione
 function ingest(ev){
+  rawCount++;
+  try{ if(ev.manufacturerData){ const k=[...ev.manufacturerData.keys()]; if(k.length) lastMfgKeys=k; } }catch(_){}
+  try{ if(ev.serviceData){ const k=[...ev.serviceData.keys()]; if(k.length) lastSvcKeys=k; } }catch(_){}
   const id=ev.device?.id||ev.device?.name||"?";
   let r=live.get(id); if(!r){ r={id,name:ev.device?.name||"Sensore",temp:null,hum:null,press:null}; live.set(id,r); }
   r.name=ev.device?.name||r.name; r.rssi=ev.rssi??r.rssi; r.seen=Date.now();
@@ -447,6 +451,7 @@ function renderSensori(){
   el.innerHTML=horseSelector()+`<h2 class="t">Sensori di ${h.name}</h2>
     <div class="notice">Non sai quale sensore è quale? <b>Avvicina</b> un sensore al telefono (compare 📍 <b>più vicino</b>) oppure <b>soffiaci sopra</b> 2″ (compare 🌬️ <b>questo!</b>). Poi assegna <b>Sotto coperta</b> o <b>Esterno</b>. ${!navigator.bluetooth?"⚠️ Web Bluetooth non disponibile in questo browser.":""}</div>
     <button class="btn ${scanning?"ghost":""}" onclick="toggleScan()">${scanning?"⏸ Ferma monitoraggio":"🔍 Avvia monitoraggio / cerca"}</button>
+    <div class="notice" style="border-left-color:var(--gold)">Diagnostica — modalità <b>${NATIVE?"nativa (app)":"web"}</b> · pacchetti BLE: <b>${rawCount}</b>${lastMfgKeys?` · id produttore: ${lastMfgKeys.join(", ")}`:""}${(NATIVE&&rawCount===0&&scanning)?"<br>0 pacchetti: controlla che <b>Bluetooth</b> e <b>Posizione</b> siano attivi e che i permessi siano concessi.":""}</div>
     <div class="sec">Sensori rilevati (${list.length})</div>
     ${list.length?list.map(d=>{const rn=roleName(d.id);
       const blown=d.idUntil&&d.idUntil>now;
