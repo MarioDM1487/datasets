@@ -189,7 +189,7 @@ if(!horses.some(h=>h.id===activeId)) activeId=horses[0].id;
 let historyMap = store.get("history_v2", {});   // {horseId:[{t,uT,uH,eT}]}   (retention 24h/7g: idea per il futuro, non ancora applicata)
 let alertsMap  = store.get("alerts_v2", {});    // {horseId:[{t,key,title,detail}]}  (notifiche push: possibile evoluzione futura)
 
-const activeHorse=()=>horses.find(h=>h.id===activeId)||horses[0];
+const activeHorse=()=>horses.find(h=>h.id===activeId)||horses[0]||null;
 const histOf=id=>historyMap[id]||(historyMap[id]=[]);
 const alertsOf=id=>alertsMap[id]||(alertsMap[id]=[]);
 
@@ -317,6 +317,9 @@ function horseSelector(){
 /* ---------- views ---------- */
 function renderHome(){
   const el=$("#v-home"); const h=activeHorse();
+  if(!h){ el.innerHTML=horseSelector()+`<div class="card q"><h2 class="t" style="margin-top:0">Nessun cavallo</h2>
+    <p class="sub">Aggiungi il tuo primo cavallo per iniziare a monitorarlo.</p>
+    <button class="btn" style="margin-top:12px" onclick="newHorse()">＋ Aggiungi cavallo</button></div>`; return; }
   const r=readingsFor(h); const c=comfort(r.uT,r.uH,r.eT);
   const delta=(r.uT!=null&&r.eT!=null)?(r.uT-r.eT):null;
   let inner;
@@ -375,6 +378,7 @@ function chartSVG(pts){
 }
 function renderStorico(){
   const el=$("#v-storico"); const h=activeHorse();
+  if(!h){ el.innerHTML=horseSelector()+`<div class="card"><p class="sub">Nessun cavallo. Aggiungine uno dal tab Cavalli.</p></div>`; return; }
   const pts=histOf(h.id).slice(-120);
   let inband=0; pts.forEach(p=>{ if(p.eT!=null){const dd=p.uT-p.eT; if(dd>=TH.dFresco&&dd<=TH.dIdeale) inband++;} });
   const pct=pts.length?Math.round(inband/pts.length*100):0;
@@ -391,7 +395,9 @@ function renderStorico(){
 }
 
 function renderAvvisi(){
-  const el=$("#v-avvisi"); const h=activeHorse(); const al=alertsOf(h.id);
+  const el=$("#v-avvisi"); const h=activeHorse();
+  if(!h){ el.innerHTML=horseSelector()+`<div class="card"><p class="sub">Nessun cavallo. Aggiungine uno dal tab Cavalli.</p></div>`; return; }
+  const al=alertsOf(h.id);
   const icon={freddo:"❄️",sudore:"💧"}, col={freddo:"var(--cold)",sudore:"var(--hot)"};
   el.innerHTML=horseSelector()+`<h2 class="t">Avvisi · ${h.name}</h2>`+
     (al.length?al.map(a=>`<div class="alert"><div class="stripe" style="background:${col[a.key]||"var(--muted)"}"></div>
@@ -423,13 +429,12 @@ function renderScheda(){
         <p class="sub" style="margin-top:8px">Per assegnare o cambiare i sensori usa il tab <b>Sensori</b> (avvicina o soffia per riconoscerli).</p>
         <button class="btn" style="margin-top:14px" onclick="saveHorse()">Salva</button>
         <button class="btn ghost sm" style="margin-top:8px" onclick="cancelEdit()">Annulla</button>
-        ${editing!=="new"&&horses.length>1?`<button class="btn danger sm" style="margin-top:8px" onclick="deleteHorse('${editing}')">Elimina cavallo</button>`:""}
+        ${editing!=="new"?`<button class="btn danger sm" style="margin-top:8px" onclick="askDelete('${editing}')">Elimina cavallo</button>`:""}
       </div>`;
     return;
   }
-  const many=horses.length>1;
   el.innerHTML=`<h2 class="t">I miei cavalli</h2>
-    <p class="sub" style="margin:0 2px 12px">Tocca un cavallo per selezionarlo, <b>✎</b> per modificarlo${many?", <b>🗑</b> per eliminarlo":""}.</p>`+
+    <p class="sub" style="margin:0 2px 12px">Tocca un cavallo per selezionarlo, <b>✎</b> per modificarlo, <b>🗑</b> per eliminarlo.</p>`+
     horses.map(h=>{
       const r=readingsFor(h); const c=comfort(r.uT,r.uH,r.eT);
       const pill=c?`<span class="pill" style="color:${c.color};background:color-mix(in srgb,${c.color} 13%,transparent)">${c.label}</span>`
@@ -440,7 +445,7 @@ function renderScheda(){
             <div class="mt" style="font-size:11.5px;color:var(--muted)">${[h.breed,h.blanket].filter(Boolean).join(" · ")||"scheda da completare"}</div></div>
           ${pill}
           <button class="edit" onclick="editHorse('${h.id}')">✎</button>
-          ${many?`<button class="edit del-btn" onclick="askDelete('${h.id}')">🗑</button>`:""}
+          <button class="edit del-btn" onclick="askDelete('${h.id}')">🗑</button>
       </div>`;
     }).join("")+
     `<button class="btn" style="margin-top:6px" onclick="newHorse()">＋ Aggiungi cavallo</button>`;
@@ -448,6 +453,7 @@ function renderScheda(){
 
 function renderSensori(){
   const el=$("#v-sensori"); const h=activeHorse();
+  if(!h){ el.innerHTML=horseSelector()+`<div class="card"><p class="sub">Aggiungi un cavallo dal tab Cavalli per abbinare i sensori.</p></div>`; return; }
   const now=Date.now();
   const list=[...live.values()].filter(d=>d.temp!=null).sort((a,b)=>(b.rssi??-999)-(a.rssi??-999));
   const maxRssi=list.length?Math.max(...list.map(d=>d.rssi??-999)):-999;
@@ -491,8 +497,8 @@ window.saveHorse=()=>{
 };
 window.askDelete=id=>{ const h=horses.find(x=>x.id===id); if(!h) return;
   if(confirm("Eliminare "+(h.name||"questo cavallo")+"? L'operazione non è reversibile.")) deleteHorse(id); };
-window.deleteHorse=id=>{ if(horses.length<=1) return; horses=horses.filter(h=>h.id!==id);
-  if(activeId===id) activeId=horses[0].id;
+window.deleteHorse=id=>{ horses=horses.filter(h=>h.id!==id);
+  if(!horses.some(h=>h.id===activeId)) activeId = horses[0] ? horses[0].id : null;
   store.set("horses",horses); store.set("activeId",activeId);
   editing=null; renderScheda(); };
 window.assign=(role,id)=>{ const h=activeHorse(); if(h.roles[role]===id) delete h.roles[role];
