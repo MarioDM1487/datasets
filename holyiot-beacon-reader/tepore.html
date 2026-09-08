@@ -114,6 +114,10 @@
     border-radius:16px;padding:13px;margin-bottom:10px}
   .hcard.on{border-color:var(--accent)}
   .hcard .edit{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted);font-weight:600}
+  .hrow{position:relative;overflow:hidden;border-radius:16px;margin-bottom:10px}
+  .hrow .hcard{margin-bottom:0;transition:transform .2s ease;touch-action:pan-y}
+  .hrow.open .hcard{transform:translateX(-104px)}
+  .hrow .del{position:absolute;top:0;right:0;bottom:0;width:104px;border:0;background:var(--hot);color:#fff;font-weight:800;font-size:13px}
 
   .alert{display:flex;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-bottom:8px;position:relative;overflow:hidden}
   .alert .stripe{position:absolute;left:0;top:0;bottom:0;width:4px}
@@ -426,20 +430,26 @@ function renderScheda(){
       </div>`;
     return;
   }
-  el.innerHTML=`<h2 class="t">I miei cavalli</h2>`+
+  const many=horses.length>1;
+  el.innerHTML=`<h2 class="t">I miei cavalli</h2>
+    <p class="sub" style="margin:0 2px 12px">Tocca un cavallo per selezionarlo, <b>✎</b> per modificarlo${many?", scorri a sinistra per <b>eliminare</b>":""}.</p>`+
     horses.map(h=>{
       const r=readingsFor(h); const c=comfort(r.uT,r.uH,r.eT);
       const pill=c?`<span class="pill" style="color:${c.color};background:color-mix(in srgb,${c.color} 13%,transparent)">${c.label}</span>`
                  :`<span class="pill" style="color:var(--muted);background:var(--surface2)">${h.roles.under?"in attesa":"no sensori"}</span>`;
-      return `<div class="hcard ${h.id===activeId?"on":""}">
-        <div class="av" onclick="setActive('${h.id}')">🐎</div>
-        <div class="sp" onclick="setActive('${h.id}')"><div class="nm" style="font-family:var(--serif);font-size:16px;font-weight:700">${h.name}</div>
-          <div class="mt" style="font-size:11.5px;color:var(--muted)">${[h.breed,h.blanket].filter(Boolean).join(" · ")||"scheda da completare"}</div></div>
-        ${pill}
-        <button class="edit" onclick="editHorse('${h.id}')">✎</button>
+      return `<div class="hrow">
+        ${many?`<button class="del" onclick="askDelete('${h.id}')">🗑 Elimina</button>`:""}
+        <div class="hcard ${h.id===activeId?"on":""}" data-id="${h.id}">
+          <div class="av" onclick="setActive('${h.id}')">🐎</div>
+          <div class="sp" onclick="setActive('${h.id}')"><div class="nm" style="font-family:var(--serif);font-size:16px;font-weight:700">${h.name}</div>
+            <div class="mt" style="font-size:11.5px;color:var(--muted)">${[h.breed,h.blanket].filter(Boolean).join(" · ")||"scheda da completare"}</div></div>
+          ${pill}
+          <button class="edit" onclick="editHorse('${h.id}')">✎</button>
+        </div>
       </div>`;
     }).join("")+
     `<button class="btn" style="margin-top:6px" onclick="newHorse()">＋ Aggiungi cavallo</button>`;
+  bindSwipe();
 }
 
 function renderSensori(){
@@ -485,6 +495,27 @@ window.saveHorse=()=>{
   store.set("horses",horses); store.set("activeId",activeId);
   editing=null; draft=null; go("home");
 };
+window.askDelete=id=>{ const h=horses.find(x=>x.id===id); if(!h) return;
+  if(confirm("Eliminare "+(h.name||"questo cavallo")+"? L'operazione non è reversibile.")) deleteHorse(id); };
+// swipe-left su una riga cavallo per rivelare "Elimina"
+function bindSwipe(){
+  document.querySelectorAll("#v-scheda .hrow").forEach(row=>{
+    const card=row.querySelector(".hcard"), del=row.querySelector(".del"); if(!del||!card) return;
+    const W=104; let x0=0,y0=0,drag=false,base=0;
+    card.addEventListener("pointerdown",e=>{ x0=e.clientX; y0=e.clientY; drag=false; base=row.classList.contains("open")?-W:0; });
+    card.addEventListener("pointermove",e=>{ const dx=e.clientX-x0, dy=e.clientY-y0;
+      if(!drag){ if(Math.abs(dx)>10 && Math.abs(dx)>Math.abs(dy)) drag=true; else return; }
+      e.preventDefault(); card.style.transform="translateX("+Math.max(-W,Math.min(0,base+dx))+"px)"; },{passive:false});
+    const end=e=>{ if(!drag) return; const t=Math.max(-W,Math.min(0,base+(e.clientX-x0)));
+      row.classList.toggle("open", t<-W/2); card.style.transform="";
+      row.__drag=true; setTimeout(()=>{row.__drag=false;},60); };
+    card.addEventListener("pointerup",end); card.addEventListener("pointercancel",end);
+    row.addEventListener("click",e=>{
+      if(row.__drag){ e.preventDefault(); e.stopPropagation(); return; }
+      if(row.classList.contains("open") && !e.target.closest(".del")){ row.classList.remove("open"); e.preventDefault(); e.stopPropagation(); }
+    },true);
+  });
+}
 window.deleteHorse=id=>{ if(horses.length<=1) return; horses=horses.filter(h=>h.id!==id);
   if(activeId===id) activeId=horses[0].id;
   store.set("horses",horses); store.set("activeId",activeId);
