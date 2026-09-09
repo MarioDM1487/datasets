@@ -184,8 +184,8 @@ if(!horses){
   const h=Object.assign(defaultHorse("Fulmine"), oldH||{}, {id:uid(), roles:oldR||{}});
   horses=[h]; store.set("horses",horses);
 }
-let activeId = store.get("activeId", horses[0].id);
-if(!horses.some(h=>h.id===activeId)) activeId=horses[0].id;
+let activeId = store.get("activeId", horses[0] ? horses[0].id : null);
+if(!horses.some(h=>h.id===activeId)) activeId = horses[0] ? horses[0].id : null;
 let historyMap = store.get("history_v2", {});   // {horseId:[{t,uT,uH,eT}]}   (retention 24h/7g: idea per il futuro, non ancora applicata)
 let alertsMap  = store.get("alerts_v2", {});    // {horseId:[{t,key,title,detail}]}  (notifiche push: possibile evoluzione futura)
 
@@ -315,11 +315,17 @@ function horseSelector(){
 }
 
 /* ---------- views ---------- */
+function setupCard(){
+  return `<div class="card q" style="text-align:center;padding:26px 18px;margin-top:8px">
+    <div class="av" style="width:66px;height:66px;border-radius:20px;font-size:34px;margin:0 auto 14px">🐎</div>
+    <h2 class="t" style="font-size:21px;margin:0">Benvenuto in Tepore</h2>
+    <p class="sub" style="margin:8px auto 0;max-width:32ch">Per iniziare crea il tuo primo cavallo. Poi gli abbinerai i due sensori (interno sotto la coperta + esterno).</p>
+    <button class="btn" style="margin-top:18px" onclick="newHorse()">＋ Crea il tuo primo cavallo</button>
+  </div>`;
+}
 function renderHome(){
   const el=$("#v-home"); const h=activeHorse();
-  if(!h){ el.innerHTML=horseSelector()+`<div class="card q"><h2 class="t" style="margin-top:0">Nessun cavallo</h2>
-    <p class="sub">Aggiungi il tuo primo cavallo per iniziare a monitorarlo.</p>
-    <button class="btn" style="margin-top:12px" onclick="newHorse()">＋ Aggiungi cavallo</button></div>`; return; }
+  if(!h){ el.innerHTML=setupCard(); return; }
   const r=readingsFor(h); const c=comfort(r.uT,r.uH,r.eT);
   const delta=(r.uT!=null&&r.eT!=null)?(r.uT-r.eT):null;
   let inner;
@@ -378,7 +384,7 @@ function chartSVG(pts){
 }
 function renderStorico(){
   const el=$("#v-storico"); const h=activeHorse();
-  if(!h){ el.innerHTML=horseSelector()+`<div class="card"><p class="sub">Nessun cavallo. Aggiungine uno dal tab Cavalli.</p></div>`; return; }
+  if(!h){ el.innerHTML=setupCard(); return; }
   const pts=histOf(h.id).slice(-120);
   let inband=0; pts.forEach(p=>{ if(p.eT!=null){const dd=p.uT-p.eT; if(dd>=TH.dFresco&&dd<=TH.dIdeale) inband++;} });
   const pct=pts.length?Math.round(inband/pts.length*100):0;
@@ -396,7 +402,7 @@ function renderStorico(){
 
 function renderAvvisi(){
   const el=$("#v-avvisi"); const h=activeHorse();
-  if(!h){ el.innerHTML=horseSelector()+`<div class="card"><p class="sub">Nessun cavallo. Aggiungine uno dal tab Cavalli.</p></div>`; return; }
+  if(!h){ el.innerHTML=setupCard(); return; }
   const al=alertsOf(h.id);
   const icon={freddo:"❄️",sudore:"💧"}, col={freddo:"var(--cold)",sudore:"var(--hot)"};
   el.innerHTML=horseSelector()+`<h2 class="t">Avvisi · ${h.name}</h2>`+
@@ -411,6 +417,7 @@ function renderAvvisi(){
 let editing=null, draft=null;
 function renderScheda(){
   const el=$("#v-scheda");
+  if(!editing && !horses.length){ el.innerHTML=setupCard(); return; }
   if(editing){
     const h = editing==="new" ? draft : horses.find(x=>x.id===editing);
     el.innerHTML=`<h2 class="t">${editing==="new"?"Nuovo cavallo":"Modifica scheda"}</h2>
@@ -453,7 +460,7 @@ function renderScheda(){
 
 function renderSensori(){
   const el=$("#v-sensori"); const h=activeHorse();
-  if(!h){ el.innerHTML=horseSelector()+`<div class="card"><p class="sub">Aggiungi un cavallo dal tab Cavalli per abbinare i sensori.</p></div>`; return; }
+  if(!h){ el.innerHTML=setupCard(); return; }
   const now=Date.now();
   const list=[...live.values()].filter(d=>d.temp!=null).sort((a,b)=>(b.rssi??-999)-(a.rssi??-999));
   const maxRssi=list.length?Math.max(...list.map(d=>d.rssi??-999)):-999;
@@ -500,7 +507,7 @@ window.askDelete=id=>{ const h=horses.find(x=>x.id===id); if(!h) return;
 window.deleteHorse=id=>{ horses=horses.filter(h=>h.id!==id);
   if(!horses.some(h=>h.id===activeId)) activeId = horses[0] ? horses[0].id : null;
   store.set("horses",horses); store.set("activeId",activeId);
-  editing=null; renderScheda(); };
+  editing=null; if(horses.length) renderScheda(); else go("home"); };
 window.assign=(role,id)=>{ const h=activeHorse(); if(h.roles[role]===id) delete h.roles[role];
   else{ h.roles[role]=id; const o=role==="under"?"ext":"under"; if(h.roles[o]===id) delete h.roles[o]; }
   store.set("horses",horses); renderSensori(); };
