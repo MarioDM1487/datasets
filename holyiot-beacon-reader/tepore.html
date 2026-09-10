@@ -110,10 +110,14 @@
   .badge.near{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold)}
   .badge.blow{background:color-mix(in srgb,var(--ideal) 22%,transparent);color:var(--ideal)}
 
-  .hcard{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);
-    border-radius:16px;padding:13px;margin-bottom:10px}
+  .hcard{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);
+    border-radius:16px;padding:12px;margin-bottom:10px;overflow:hidden}
   .hcard.on{border-color:var(--accent)}
-  .hcard .edit{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--muted);font-weight:600}
+  .hcard .av{flex:0 0 auto}
+  .hcard .sp{flex:1 1 auto;min-width:0}
+  .hcard .nm,.hcard .mt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hcard .pill{flex:0 0 auto;max-width:38%;overflow:hidden;text-overflow:ellipsis}
+  .hcard .edit{flex:0 0 auto;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 9px;font-size:13px;color:var(--muted);font-weight:600}
   .hcard .edit.del-btn{color:var(--hot);border-color:color-mix(in srgb,var(--hot) 40%,transparent)}
 
   .alert{display:flex;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-bottom:8px;position:relative;overflow:hidden}
