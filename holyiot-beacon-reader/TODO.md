@@ -23,6 +23,17 @@ Elenco di ciò che manca o si può migliorare.
 - [ ] **Avvisi**: cronologia più ricca, soglie personalizzabili, suoni/vibrazione.
 - [ ] **Batteria sensore** mostrata in app (ora non nell'advertisement; via GATT o modello sensore).
 
+## 📦 Distribuzione (DA DECIDERE)
+Come far scaricare l'app. Per ora si resta al **sideload dell'APK** (Artifacts della build).
+Opzioni sul tavolo (valgono per **Android**; iPhone solo App Store o sideload):
+- [ ] **Sito / link diretto** (consigliato per il pilota): pagina di download (GitHub Pages) con **QR** + istruzioni. Pro: gratis, nessuna revisione, nessun vincolo. Contro: avviso "installa app sconosciute", no auto-update.
+- [ ] **Release automatica su GitHub** a ogni build (link APK stabile, senza login).
+- [ ] **Controllo aggiornamenti in-app** (l'app verifica versione + link e propone "Aggiorna") → necessario fuori dal Play.
+- [ ] **Chiave di rilascio stabile** (non quella di debug) per la distribuzione pubblica.
+- [ ] **Google Play Store**: 25 $ una-tantum + verifica identità; per **account personali nuovi** vincolo test chiuso **20 tester / 14 giorni** (l'account **azienda** lo evita). Serve **.aab firmato**, **privacy policy (URL)**, icona 512, grafica 1024×500, screenshot, moduli classificazione/dati.
+- [ ] **Store alternativi**: Amazon Appstore, Samsung Galaxy Store (fattibili); APKPure/Aptoide (fiducia bassa); F-Droid non adatto (solo FOSS).
+- [ ] **Decisione**: account Play **personale vs azienda**? Pilota diretto ora e Play dopo?
+
 ## 🏗️ Infrastruttura / futuro
 - [ ] **Gateway in stalla** (Raspberry) per lettura 24/7 e storico su server.
 - [ ] **Variante cani** 🐕 (stessa tecnologia, logica indossata col padrone).
