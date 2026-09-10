@@ -1,4 +1,4 @@
-# MANTO — Come funziona
+# Tepore — Come funziona
 
 > **Il comfort termico del cavallo, in un colpo d'occhio.**
 > Documento di presentazione del sistema per chi lo mostra e lo vende.
@@ -15,7 +15,7 @@ valutare a mano:
 Oggi il proprietario tocca il torace con la mano e "va a sensazione", spesso di notte o quando
 non è in scuderia. Nessun dato, nessuno storico, nessun avviso.
 
-## La soluzione: MANTO
+## La soluzione: Tepore
 Due piccoli sensori Bluetooth e un'app sul telefono:
 - un sensore **interno**, sotto la coperta (misura il microclima a contatto con l'animale);
 - un sensore **esterno**, che misura l'ambiente.
@@ -100,7 +100,8 @@ quando non sei in scuderia."**
 
 ## Stato attuale e prossimi passi
 - ✅ **Web app** funzionante su **Android** (Chrome).
-- ▶️ **App Android** installabile (in arrivo) e **iPhone** (app nativa).
+- ✅ **App Android** installabile (APK).
+- ▶️ **iPhone** (app nativa) — prossimo passo.
 - 🗓️ **Gateway in stalla** per il monitoraggio **24 ore su 24** e storico continuo.
 - 🐕 Variante per **cani** (stessa tecnologia).
 
