@@ -1,0 +1,6 @@
+{
+  "gateway_id": "stalla-nord-1",
+  "endpoint": "https://IL-TUO-BACKEND/ingest",
+  "token": "METTI-QUI-IL-TOKEN-DI-SCRITTURA",
+  "post_interval_s": 30
+}

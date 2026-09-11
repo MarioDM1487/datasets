@@ -1,0 +1,15 @@
+[Unit]
+Description=Tepore BLE gateway (stalla -> cloud)
+After=bluetooth.target network-online.target
+Wants=network-online.target
+
+[Service]
+# Modifica User e i percorsi se necessario
+User=pi
+WorkingDirectory=/home/pi/tepore-gateway
+ExecStart=/usr/bin/python3 /home/pi/tepore-gateway/tepore_gateway.py --config /home/pi/tepore-gateway/config.json
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
