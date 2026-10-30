@@ -4,6 +4,10 @@ Obiettivo: **una sola app** in cui l'utente sceglie il **prodotto acquistato** e
 configura da sola — numero di sensori, ruoli, logica di comfort, soglie, termini e icona.
 Il "cavallo" di oggi diventa **un caso particolare** di un modello più generale.
 
+> ✅ **Stato: implementato** in `tepore.html`. Al primo avvio compare **"Quale prodotto hai
+> acquistato?"** con tre profili (Cavallo · Cane · Bambino); la scelta configura sensori,
+> ruoli, soglie e termini. Vedi §9 per le soglie usate (indicative, da tarare).
+
 ---
 
 ## 1. Idea chiave: il "Profilo prodotto"
@@ -74,13 +78,30 @@ Un prodotto per neonati tocca sicurezza e aspetti legali. Raccomandazioni:
 4. **Comfort per profilo** (Δ per coperta; modello per bambino/cane da definire).
 5. (futuro) **QR confezione** per auto-assegnazione, profili scaricabili.
 
-## 8. Decisioni aperte (mi servono per procedere bene)
-- [ ] Quali **profili** attiviamo subito? (cavallo è fatto; cane sì/no ora; bambino sì/no/dopo)
-- [ ] Per il **cane**: 1 o 2 sensori? indossato con cappottino (Δ) o solo microclima?
-- [ ] Per il **bambino**: lo affrontiamo ora (con cautele e verifica legale) o lo teniamo come
-      profilo "in valutazione"?
-- [ ] I prodotti venduti avranno un **QR coi MAC** sulla confezione? (abilita l'auto-assegnazione)
-- [ ] Soglie **cane/bambino**: chi le valida (veterinario / pediatra)?
+## 8. Decisioni (prese)
+- [x] **Profili attivi subito**: tutti e tre — cavallo, cane, bambino.
+- [x] **Cane**: **1 sensore** (cappottino, "addosso"), logica **assoluta** sul microclima.
+- [x] **Bambino**: lo sviluppiamo ora, ma **solo informazione temperatura** — **NON** dispositivo
+      medico, con disclaimer in app. Verifiche legali in corso prima della vendita.
+- [x] **Identificazione sensori**: come oggi — **📍 vicinanza** e **🌬️ soffio** (niente QR per ora).
+- [x] **Soglie cane/bambino**: valori iniziali da riferimenti online (vedi §9), **da affinare**
+      con veterinario / pediatra.
 
-> Quando rispondi a queste, parto con lo **step 1** (profili nel codice) che non cambia nulla
-> di visibile ma prepara tutto il resto.
+## 9. Soglie implementate (indicative — da tarare)
+| Profilo | Modello | Soglie |
+|---|---|---|
+| **Cavallo — coperta** | Δ interno−esterno | freddo <2° · fresco 2–5° · **ideale 5–10°** · caldo 10–13° · sudore >13° o Δ>10° con umidità ≥80% |
+| **Cane — cappottino** | assoluto (microclima sotto il capo) | freddo <18° · fresco 18–24° · **ideale 24–32°** · caldo 32–36° · troppo caldo >36° |
+| **Bambino — cameretta** | assoluto (temperatura ambiente) | freddo <16° · fresco 16–18° · **ideale 18–21°** · caldo 21–23° · troppo caldo >23° |
+
+> Riferimenti: cameretta ideale ~18–21 °C (NHS / Lullaby Trust citano 16–20 °C in chiave
+> anti-surriscaldamento). Il cane/microclima **non ha uno standard**: le soglie "addosso" sono
+> stime prudenziali da validare. Le soglie stanno **dentro il profilo** (`PROFILI` in `tepore.html`),
+> quindi si cambiano in un punto solo.
+
+## 10. Da fare ancora
+- [ ] Validazione soglie con **veterinario / pediatra**.
+- [ ] (futuro) **QR sulla confezione** coi MAC → auto-assegnazione sensori.
+- [ ] Profilo **"Altro / generico"** (scegli sensori + modello) se servirà per casi pilota.
+- [ ] Terminologia/anagrafica per cane e bambino: oggi la scheda riusa i campi base; si possono
+      specializzare ulteriormente.

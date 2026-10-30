@@ -101,6 +101,21 @@
 
   .sec{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;margin:12px 2px 8px;overflow-wrap:anywhere}
 
+  .prodlist{display:flex;flex-direction:column;gap:9px;margin-top:16px}
+  .prod{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 14px;color:var(--text);transition:.15s}
+  .prod:hover,.prod:active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+  .prod .pe{font-size:26px;flex:0 0 auto;width:34px;text-align:center}
+  .prod .pt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+  .prod .pt b{font-family:var(--serif);font-size:16px}
+  .prod .pt small{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prod .pa{color:var(--muted);font-size:22px;flex:0 0 auto}
+  .ptag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--accent);
+    background:color-mix(in srgb,var(--accent) 10%,transparent);border-radius:999px;padding:4px 11px;margin-bottom:12px}
+  .ptag .pe{font-size:15px}
+  .disc{margin-top:12px;font-size:11.5px;line-height:1.5;color:var(--muted);
+    background:color-mix(in srgb,var(--gold) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--gold) 28%,transparent);border-radius:10px;padding:9px 11px}
+
   .dev{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:9px}
   .dev .rd{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--bg2);font-size:15px;flex:0 0 auto}
   .dev .nm{font-weight:700;font-size:13.5px} .dev .mt{font-size:11px;color:var(--muted);margin-top:1px}
@@ -166,7 +181,7 @@
   <button data-go="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Oggi</button>
   <button data-go="storico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5"/><path d="M4 15l5-5 4 3 6-7"/></svg>Storico</button>
   <button data-go="avvisi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Avvisi</button>
-  <button data-go="scheda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Cavalli</button>
+  <button data-go="scheda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Soggetti</button>
   <button data-go="sensori"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v6m0 8v6M2 12h6m8 0h6"/><circle cx="12" cy="12" r="3"/></svg>Sensori</button>
 </nav>
 
@@ -180,51 +195,100 @@ const store={
   get(k,d){ try{const v=localStorage.getItem("manto_"+k);return v==null?d:JSON.parse(v);}catch(_){return d;} },
   set(k,v){ localStorage.setItem("manto_"+k, JSON.stringify(v)); }
 };
-function defaultHorse(name){ return {id:uid(), name:name||"Nuovo cavallo", breed:"", sex:"", age:"",
-  weight:"", blanket:"", box:"", notes:"", roles:{}}; }
+function defaultHorse(profileId, name){ return {id:uid(), profile:profileId||"cavallo-coperta",
+  name:name||"", breed:"", sex:"", age:"", weight:"", blanket:"", box:"", notes:"", roles:{}}; }
 
-/* Multi-horse model. Each horse owns its two sensors (sotto coperta + esterno,
-   one external per blanket) and its own history + alerts. */
+/* ---------- Profili prodotto (soggetto + sensori + logica comfort) ----------
+   Una sola app: il prodotto scelto configura sensori, ruoli, soglie e termini.
+   Soglie INDICATIVE, da affinare (veterinario/pediatra). Il bambino è solo
+   "conoscenza temperatura", NON un dispositivo medico. */
+const PROFILI = {
+  "cavallo-coperta": {
+    label:"Cavallo", emoji:"🐎", tipo:"cavallo",
+    sensori:[ {role:"under",label:"Interno (sotto coperta)",short:"Interno"},
+              {role:"ext",  label:"Esterno",short:"Esterno"} ],
+    modello:"delta",
+    th:{ dFreddo:2, dFresco:5, dIdeale:10, dCaldo:13, humSweat:80 },
+    band:["Freddo","Ideale","Sudore"],
+    labels:{freddo:"Troppo freddo",fresco:"Fresco",ideale:"Al caldo",caldo:"Si scalda",sudore:"Sudorazione"},
+    msgs:{freddo:"La coperta non scalda abbastanza.",fresco:"Isolamento un po' scarso.",
+      ideale:"Comfort ottimale: la coperta tiene la differenza giusta.",caldo:"Si scalda troppo rispetto all'esterno.",
+      sudore:"Rischio sudore: differenza eccessiva."},
+  },
+  "cane-cappottino": {
+    label:"Cane", emoji:"🐕", tipo:"cane",
+    sensori:[ {role:"under",label:"Addosso (cappottino)",short:"Addosso"} ],
+    modello:"assoluto",
+    th:{ freddo:18, fresco:24, ideale:32, caldo:36, humSweat:75 },
+    band:["Freddo","Ideale","Caldo"],
+    labels:{freddo:"Ha freddo",fresco:"Fresco",ideale:"Al caldo giusto",caldo:"Si scalda",sudore:"Troppo caldo"},
+    msgs:{freddo:"Microclima freddo: il cappottino scalda poco.",fresco:"Un po' freschino.",
+      ideale:"Temperatura comoda sotto il cappottino.",caldo:"Si sta scaldando troppo.",
+      sudore:"Troppo caldo: rischio surriscaldamento."},
+  },
+  "bambino-cameretta": {
+    label:"Bambino", emoji:"👶", tipo:"bambino",
+    sensori:[ {role:"under",label:"Cameretta / culla",short:"Temp"} ],
+    modello:"assoluto",
+    th:{ freddo:16, fresco:18, ideale:21, caldo:23, humSweat:65 },
+    band:["Freddo","Ideale","Caldo"],
+    labels:{freddo:"Fa freddo",fresco:"Fresco",ideale:"Ideale",caldo:"Un po' caldo",sudore:"Troppo caldo"},
+    msgs:{freddo:"Cameretta fredda (consigliato ~18–21°C).",fresco:"Un po' fresca.",
+      ideale:"Temperatura ideale per il sonno (~18–21°C).",caldo:"Cameretta un po' calda.",
+      sudore:"Troppo caldo: valuta di rinfrescare la stanza."},
+    nota:"Solo informazione sulla temperatura. NON è un dispositivo medico e non sostituisce la sorveglianza.",
+  },
+};
+const profOf=h=>PROFILI[(h&&h.profile)||"cavallo-coperta"]||PROFILI["cavallo-coperta"];
+
+/* Model: each subject owns its sensors by role, its own history + alerts. */
 let horses = store.get("horses", null);
 if(!horses){
-  const oldH=store.get("horse",null), oldR=store.get("roles",{});
-  const h=Object.assign(defaultHorse("Fulmine"), oldH||{}, {id:uid(), roles:oldR||{}});
-  horses=[h]; store.set("horses",horses);
+  const oldH=store.get("horse",null), oldR=store.get("roles",null);
+  if(oldH||oldR){   // migrazione da versione precedente (cavallo singolo)
+    const h=Object.assign(defaultHorse("cavallo-coperta","Fulmine"), oldH||{}, {id:uid(), profile:"cavallo-coperta", roles:oldR||{}});
+    horses=[h];
+  } else { horses=[]; }   // installazione nuova → onboarding "quale prodotto?"
+  store.set("horses",horses);
 }
+horses.forEach(h=>{ if(!h.profile) h.profile="cavallo-coperta"; });   // migrazione
 let activeId = store.get("activeId", horses[0] ? horses[0].id : null);
 if(!horses.some(h=>h.id===activeId)) activeId = horses[0] ? horses[0].id : null;
-let historyMap = store.get("history_v2", {});   // {horseId:[{t,uT,uH,eT}]}   (retention 24h/7g: idea per il futuro, non ancora applicata)
-let alertsMap  = store.get("alerts_v2", {});    // {horseId:[{t,key,title,detail}]}  (notifiche push: possibile evoluzione futura)
+let historyMap = store.get("history_v2", {});
+let alertsMap  = store.get("alerts_v2", {});
 
 const activeHorse=()=>horses.find(h=>h.id===activeId)||horses[0]||null;
 const histOf=id=>historyMap[id]||(historyMap[id]=[]);
 const alertsOf=id=>alertsMap[id]||(alertsMap[id]=[]);
 
-/* ---------- comfort thresholds (indicative, tune with a vet) ----------
-   Il comfort dipende dal Δ = interno (sotto coperta) − esterno, non dalla
-   temperatura assoluta: la coperta deve tenere l'animale più caldo dell'esterno
-   della giusta differenza. Ideale 5–10°C; oltre 10°C con umidità alta = sudore. */
-const TH={ dFreddo:2, dFresco:5, dIdeale:10, dCaldo:13, humSweat:80 };
-function comfort(uT,uH,eT){
-  if(uT==null||eT==null) return null;      // serve sia interno che esterno
-  const d=uT-eT;
-  let key;
-  if(d>TH.dCaldo || (d>TH.dIdeale && uH!=null && uH>=TH.humSweat)) key="sudore";
-  else if(d>TH.dIdeale) key="caldo";
-  else if(d>=TH.dFresco) key="ideale";
-  else if(d>=TH.dFreddo) key="fresco";
-  else key="freddo";
-  const meta={
-    freddo:{label:"Troppo freddo",color:"var(--cold)",sev:"cold",msg:"La coperta non scalda abbastanza: l'animale resta freddo."},
-    fresco:{label:"Fresco",color:"var(--cold)",sev:"info",msg:"Isolamento un po' scarso. Tieni d'occhio l'andamento."},
-    ideale:{label:"Al caldo",color:"var(--ideal)",sev:"ok",msg:"Comfort ottimale: la coperta mantiene la differenza giusta."},
-    caldo:{label:"Si scalda",color:"var(--warn)",sev:"warn",msg:"Si scalda troppo rispetto all'esterno."},
-    sudore:{label:"Sudorazione",color:"var(--hot)",sev:"hot",msg:"Rischio sudore: differenza eccessiva, poi il sudore raffredda l'animale."},
-  }[key];
-  let pos=d/16*100;
-  if(key==="sudore" && d<=TH.dCaldo) pos=90;   // spinto dall'umidità
+/* ---------- comfort (per profilo) ---------- */
+function comfort(prof, r){
+  prof = prof || PROFILI["cavallo-coperta"];
+  const th=prof.th; let key, pos, extra={};
+  if(prof.modello==="delta"){
+    if(r.uT==null || r.eT==null) return null;         // serve interno + esterno
+    const d=r.uT-r.eT; extra.delta=d;
+    if(d>th.dCaldo || (d>th.dIdeale && r.uH!=null && r.uH>=th.humSweat)) key="sudore";
+    else if(d>th.dIdeale) key="caldo";
+    else if(d>=th.dFresco) key="ideale";
+    else if(d>=th.dFreddo) key="fresco";
+    else key="freddo";
+    pos=d/16*100; if(key==="sudore" && d<=th.dCaldo) pos=90;
+  } else {                                            // modello assoluto (1 sensore)
+    if(r.uT==null) return null;
+    const t=r.uT;
+    if(t<th.freddo) key="freddo";
+    else if(t<th.fresco) key="fresco";
+    else if(t<=th.ideale) key="ideale";
+    else if(t<=th.caldo) key="caldo";
+    else key="sudore";
+    if(r.uH!=null && r.uH>=th.humSweat && (key==="ideale"||key==="caldo")) key="sudore";
+    const lo=th.freddo-4, hi=th.caldo+4; pos=(t-lo)/(hi-lo)*100;
+  }
   pos=Math.max(3,Math.min(97,pos));
-  return {key,pos,delta:d,...meta};
+  const COL={freddo:["var(--cold)","cold"],fresco:["var(--cold)","info"],ideale:["var(--ideal)","ok"],caldo:["var(--warn)","warn"],sudore:["var(--hot)","hot"]};
+  const [color,sev]=COL[key];
+  return {key,pos,color,sev,label:(prof.labels&&prof.labels[key])||key,msg:(prof.msgs&&prof.msgs[key])||"",...extra};
 }
 
 /* ---------- BLE decode ---------- */
@@ -283,6 +347,16 @@ function ingest(ev){
   updateLive();
 }
 
+/* ---------- helpers derivati dal profilo ---------- */
+const emojiOf = h => profOf(h).emoji;
+const twoSensor = h => profOf(h).modello==="delta";                 // 2 sensori (interno+esterno)
+const underMeta = h => profOf(h).sensori.find(s=>s.role==="under") || {label:"Sensore",short:"Temp"};
+const extMeta   = h => profOf(h).sensori.find(s=>s.role==="ext");
+const subjNoun  = h => profOf(h).label.toLowerCase();               // "cavallo" / "cane" / "bambino"
+const bandLabels= h => profOf(h).band || ["Freddo","Ideale","Caldo"];
+const capoLabel = h => ({"cavallo-coperta":"Coperta","cane-cappottino":"Cappottino","bambino-cameretta":"Cameretta / culla"}[h.profile]||"Prodotto");
+const PROFILE_ORDER = ["cavallo-coperta","cane-cappottino","bambino-cameretta"];
+
 /* ---------- readings + sampling ---------- */
 function readingsFor(h){
   const u=h.roles?.under?live.get(h.roles.under):null;
@@ -299,12 +373,13 @@ function sampleAll(){
     const hist=histOf(h.id);
     hist.push({t:now,uT:r.uT,uH:r.uH,eT:r.eT});
     if(hist.length>720) historyMap[h.id]=hist.slice(-720);
-    const c=comfort(r.uT,r.uH,r.eT);
+    const c=comfort(profOf(h),r);
     if(c && c.key!==lastKeyMap[h.id]){
       if(["freddo","sudore"].includes(c.key)){
         const al=alertsOf(h.id);
+        const d2=twoSensor(h)?` · esterno ${r.eT!=null?r.eT.toFixed(1)+"°C":"—"}`:"";
         al.unshift({t:now,key:c.key,title:c.label,
-          detail:`${h.name} · sotto coperta ${r.uT.toFixed(1)}°C · esterno ${r.eT!=null?r.eT.toFixed(1)+"°C":"—"}${r.uH!=null?" · umidità "+r.uH.toFixed(0)+"%":""}`});
+          detail:`${h.name} · ${underMeta(h).short.toLowerCase()} ${r.uT.toFixed(1)}°C${d2}${r.uH!=null?" · umidità "+r.uH.toFixed(0)+"%":""}`});
         alertsMap[h.id]=al.slice(0,60);
       }
       lastKeyMap[h.id]=c.key;
@@ -317,62 +392,76 @@ function sampleAll(){
 const timeAgo=ts=>{ if(!ts) return "—"; const s=Math.round((Date.now()-ts)/1000); return s<60?s+"″ fa":Math.round(s/60)+"′ fa"; };
 const hhmm=ts=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
 function horseSelector(){
-  return `<div class="hsel">`+horses.map(h=>`<button class="hchip ${h.id===activeId?"on":""}" onclick="setActive('${h.id}')">${h.name||"—"}</button>`).join("")
-    +`<button class="hchip add" onclick="newHorse()">＋ Cavallo</button></div>`;
+  return `<div class="hsel">`+horses.map(h=>`<button class="hchip ${h.id===activeId?"on":""}" onclick="setActive('${h.id}')">${emojiOf(h)} ${h.name||"—"}</button>`).join("")
+    +`<button class="hchip add" onclick="newHorse()">＋ Nuovo</button></div>`;
 }
 
 /* ---------- views ---------- */
+function productButtons(){
+  return PROFILE_ORDER.map(id=>{const p=PROFILI[id];
+    return `<button class="prod" onclick="newHorse('${id}')">
+      <span class="pe">${p.emoji}</span>
+      <span class="pt"><b>${p.label}</b><small>${p.sensori.length} sensor${p.sensori.length>1?"i":"e"} · ${p.sensori.map(s=>s.short).join(" + ")}</small></span>
+      <span class="pa">›</span></button>`;}).join("");
+}
 function setupCard(){
-  return `<div class="card q" style="text-align:center;padding:26px 18px;margin-top:8px">
-    <div class="av" style="width:66px;height:66px;border-radius:20px;font-size:34px;margin:0 auto 14px">🐎</div>
+  return `<div class="card q" style="text-align:center;padding:24px 18px 20px;margin-top:8px">
+    <div class="av" style="width:60px;height:60px;border-radius:18px;font-size:30px;margin:0 auto 12px">🌡️</div>
     <h2 class="t" style="font-size:21px;margin:0">Benvenuto in Tepore</h2>
-    <p class="sub" style="margin:8px auto 0;max-width:32ch">Per iniziare crea il tuo primo cavallo. Poi gli abbinerai i due sensori (interno sotto la coperta + esterno).</p>
-    <button class="btn" style="margin-top:18px" onclick="newHorse()">＋ Crea il tuo primo cavallo</button>
+    <p class="sub" style="margin:8px auto 2px;max-width:34ch">Quale prodotto hai acquistato? La scelta configura sensori e soglie.</p>
+    <div class="prodlist">${productButtons()}</div>
   </div>`;
 }
 function renderHome(){
   const el=$("#v-home"); const h=activeHorse();
   if(!h){ el.innerHTML=setupCard(); return; }
-  const r=readingsFor(h); const c=comfort(r.uT,r.uH,r.eT);
+  const p=profOf(h); const two=twoSensor(h);
+  const r=readingsFor(h); const c=comfort(p,r);
   const delta=(r.uT!=null&&r.eT!=null)?(r.uT-r.eT):null;
+  const em=p.emoji, sub=h.blanket?h.blanket:"";
+  const bl=bandLabels(h);
+  const idrow=(extra="")=>`<div class="idrow"><div class="av">${em}</div><div><div class="nm">${h.name}</div><div class="mt">${sub}${extra}</div></div></div>`;
   let inner;
   if(!h.roles.under){
-    inner=`<div class="card q"><div class="idrow"><div class="av">🐎</div><div><div class="nm">${h.name}</div><div class="mt">${h.blanket||"coperta non impostata"}</div></div></div>
-      <p class="sub" style="margin-top:12px">Abbina i sensori di ${h.name}: quello <b>sotto la coperta</b> e quello <b>esterno</b>.</p>
-      <button class="btn" style="margin-top:12px" onclick="go('sensori')">Abbina i sensori</button></div>`;
+    inner=`<div class="card q">${idrow()}
+      <p class="sub" style="margin-top:12px">Abbina ${two?"i sensori":"il sensore"} di ${h.name}: ${two?`quello <b>${underMeta(h).short.toLowerCase()}</b> e quello <b>esterno</b>`:`il sensore <b>${underMeta(h).label.toLowerCase()}</b>`}.</p>
+      <button class="btn" style="margin-top:12px" onclick="go('sensori')">Abbina ${two?"i sensori":"il sensore"}</button></div>`;
   } else if(!scanning){
-    inner=`<div class="card"><div class="idrow"><div class="av">🐎</div><div><div class="nm">${h.name}</div><div class="mt">${h.blanket||""}</div></div></div>
-      <p class="sub" style="margin-top:12px">Monitoraggio in pausa. Avvialo per leggere in continuo i sensori abbinati e vedere la temperatura di ${h.name}.</p>
+    inner=`<div class="card">${idrow()}
+      <p class="sub" style="margin-top:12px">Monitoraggio in pausa. Avvialo per leggere in continuo ${two?"i sensori abbinati":"il sensore"} e vedere lo stato di ${h.name}.</p>
       <button class="btn" style="margin-top:12px" onclick="startScan(false)">▶ Avvia monitoraggio</button></div>`;
   } else if(!c){
     let m;
-    if(r.uT==null) m="In attesa di dati dal sensore <b>interno</b> (sotto coperta). Assicurati che sia acceso e vicino.";
-    else if(!h.roles.ext) m="Manca il sensore <b>esterno</b>: serve per calcolare il Δ e il comfort. Assegnalo dai Sensori.";
+    if(r.uT==null) m=`In attesa di dati dal sensore <b>${underMeta(h).label.toLowerCase()}</b>. Assicurati che sia acceso e vicino.`;
+    else if(two && !h.roles.ext) m="Manca il sensore <b>esterno</b>: serve per calcolare il Δ e il comfort. Assegnalo dai Sensori.";
     else m="In attesa di dati dal sensore <b>esterno</b>. Assicurati che sia acceso e vicino.";
-    inner=`<div class="card"><div class="idrow"><div class="av">🐎</div><div><div class="nm">${h.name}</div><div class="mt">${h.blanket||""}</div></div></div>
+    inner=`<div class="card">${idrow()}
       <p class="sub" style="margin-top:12px">${m}</p>
-      ${!h.roles.ext?`<button class="btn sm" style="margin-top:10px" onclick="go('sensori')">Vai ai Sensori</button>`:""}
-      ${r.uT!=null?`<div class="tiles" style="margin-top:12px"><div class="tile"><div class="k">Interno</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div></div><div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div></div></div>`:""}</div>`;
+      ${(two&&!h.roles.ext)?`<button class="btn sm" style="margin-top:10px" onclick="go('sensori')">Vai ai Sensori</button>`:""}
+      ${r.uT!=null?`<div class="tiles" style="margin-top:12px"><div class="tile"><div class="k">${underMeta(h).short}</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div></div>${two?`<div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div></div>`:""}</div>`:""}</div>`;
   } else {
+    const deltaNote=(two&&delta!=null)?` La coperta tiene <b>${delta>=0?"+":""}${delta.toFixed(1)}°</b> sull'esterno.`:"";
     inner=`<div class="card">
-      <div class="idrow"><div class="av">🐎</div>
-        <div><div class="nm">${h.name}</div><div class="mt">${h.blanket||""}${h.box?" · "+h.box:""}</div></div>
+      <div class="idrow"><div class="av">${em}</div>
+        <div><div class="nm">${h.name}</div><div class="mt">${sub}${h.box?(sub?" · ":"")+h.box:""}</div></div>
         <div class="sp"></div>
         <span class="pill" style="color:${c.color};background:color-mix(in srgb,${c.color} 13%,transparent);border-color:color-mix(in srgb,${c.color} 32%,transparent)">${c.label}</span>
       </div>
       <div class="word"><span class="lamp" style="background:${c.color}"></span>${c.label}</div>
-      <p class="msg">${c.msg}${delta!=null?` La coperta tiene <b>${delta>=0?"+":""}${delta.toFixed(1)}°</b> sull'esterno.`:""}</p>
+      <p class="msg">${c.msg}${deltaNote}</p>
       <div class="band"><div class="mk" style="left:${c.pos}%"></div></div>
-      <div class="bl"><span>Freddo</span><span>Ideale</span><span>Sudore</span></div>
-      ${c.sev==="hot"?`<div class="alarm">🔴 Sudorazione — controlla la coperta</div>`:""}
-      ${c.sev==="cold"?`<div class="alarm cold">🔵 Troppo freddo — coperta insufficiente</div>`:""}
+      <div class="bl"><span>${bl[0]}</span><span>${bl[1]}</span><span>${bl[2]}</span></div>
+      ${c.sev==="hot"?`<div class="alarm">🔴 ${c.label}${two?" — controlla la coperta":""}</div>`:""}
+      ${c.sev==="cold"?`<div class="alarm cold">🔵 ${c.label}${two?" — coperta insufficiente":""}</div>`:""}
     </div>
     <div class="tiles">
-      <div class="tile"><div class="k">Interno</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div><div class="s">${(r.uH!=null?"umidità "+r.uH.toFixed(0)+"% · ":"")+timeAgo(r.uSeen)}</div></div>
-      <div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div><div class="s">${r.eT!=null?timeAgo(r.eSeen):"nessun sensore esterno"}</div></div>
-      <div class="tile"><div class="k">Δ isolamento</div><div class="v">${delta!=null?(delta>=0?"+":"")+delta.toFixed(1):"—"}<small>°C</small></div><div class="s">efficacia coperta</div></div>
-      <div class="tile"><div class="k">Umidità pelo</div><div class="v">${r.uH!=null?r.uH.toFixed(0):"—"}<small>%</small></div><div class="s">${r.uH!=null&&r.uH>=TH.humSweat?"alta · sudore":"nella norma"}</div></div>
-    </div>`;
+      <div class="tile"><div class="k">${underMeta(h).short}</div><div class="v">${r.uT.toFixed(1)}<small>°C</small></div><div class="s">${(r.uH!=null?"umidità "+r.uH.toFixed(0)+"% · ":"")+timeAgo(r.uSeen)}</div></div>
+      ${two?`<div class="tile"><div class="k">Esterno</div><div class="v">${r.eT!=null?r.eT.toFixed(1):"—"}<small>°C</small></div><div class="s">${r.eT!=null?timeAgo(r.eSeen):"nessun sensore esterno"}</div></div>
+      <div class="tile"><div class="k">Δ isolamento</div><div class="v">${delta!=null?(delta>=0?"+":"")+delta.toFixed(1):"—"}<small>°C</small></div><div class="s">efficacia coperta</div></div>`
+      :`<div class="tile"><div class="k">Soglia ideale</div><div class="v">${p.th.fresco}–${p.th.ideale}<small>°C</small></div><div class="s">intervallo comodo</div></div>`}
+      <div class="tile"><div class="k">Umidità</div><div class="v">${r.uH!=null?r.uH.toFixed(0):"—"}<small>%</small></div><div class="s">${r.uH!=null&&r.uH>=p.th.humSweat?"alta":"nella norma"}</div></div>
+    </div>
+    ${p.nota?`<p class="sub disc">⚠️ ${p.nota}</p>`:""}`;
   }
   el.innerHTML=horseSelector()+inner;
 }
@@ -392,16 +481,25 @@ function chartSVG(pts){
 function renderStorico(){
   const el=$("#v-storico"); const h=activeHorse();
   if(!h){ el.innerHTML=setupCard(); return; }
+  const p=profOf(h); const two=twoSensor(h);
   const pts=histOf(h.id).slice(-120);
-  let inband=0; pts.forEach(p=>{ if(p.eT!=null){const dd=p.uT-p.eT; if(dd>=TH.dFresco&&dd<=TH.dIdeale) inband++;} });
+  let inband=0; pts.forEach(pt=>{ const cc=comfort(p,{uT:pt.uT,uH:pt.uH,eT:pt.eT}); if(cc&&cc.key==="ideale") inband++; });
   const pct=pts.length?Math.round(inband/pts.length*100):0;
-  const deltas=pts.filter(p=>p.uT!=null&&p.eT!=null).map(p=>p.uT-p.eT);
-  const avgD=deltas.length?(deltas.reduce((a,b)=>a+b,0)/deltas.length):null;
+  let stat;
+  if(two){
+    const deltas=pts.filter(pt=>pt.uT!=null&&pt.eT!=null).map(pt=>pt.uT-pt.eT);
+    const avgD=deltas.length?(deltas.reduce((a,b)=>a+b,0)/deltas.length):null;
+    stat=`<div class="tile plain"><div class="k">Δ medio</div><div class="v">${avgD!=null?(avgD>=0?"+":"")+avgD.toFixed(1):"—"}<small>°C</small></div><div class="s">isolamento medio</div></div>`;
+  } else {
+    const ts=pts.filter(pt=>pt.uT!=null).map(pt=>pt.uT);
+    const avgT=ts.length?(ts.reduce((a,b)=>a+b,0)/ts.length):null;
+    stat=`<div class="tile plain"><div class="k">Media</div><div class="v">${avgT!=null?avgT.toFixed(1):"—"}<small>°C</small></div><div class="s">${underMeta(h).short.toLowerCase()}</div></div>`;
+  }
   el.innerHTML=horseSelector()+`<h2 class="t">Storico · ${h.name}</h2>
     <div class="card">${chartSVG(pts)}
-      <div class="bl" style="margin-top:10px"><span style="color:var(--accent)">● Interno</span><span style="color:var(--cold)">● Esterno</span><span>Δ ideale 5–10°</span></div></div>
+      <div class="bl" style="margin-top:10px"><span style="color:var(--accent)">● ${underMeta(h).short}</span>${two?`<span style="color:var(--cold)">● Esterno</span><span>Δ ideale 5–10°</span>`:`<span>Ideale ${p.th.fresco}–${p.th.ideale}°C</span>`}</div></div>
     <div class="tiles">
-      <div class="tile plain"><div class="k">Δ medio</div><div class="v">${avgD!=null?(avgD>=0?"+":"")+avgD.toFixed(1):"—"}<small>°C</small></div><div class="s">isolamento medio</div></div>
+      ${stat}
       <div class="tile plain"><div class="k">In comfort</div><div class="v">${pct}<small>%</small></div><div class="s">${pts.length} campioni</div></div>
     </div>
     <p class="sub" style="margin:6px 2px">La web app registra solo mentre è aperta. Storico continuo H24 e conservazione (24h / 7 giorni) arriveranno col gateway in stalla.</p>`;
@@ -424,56 +522,69 @@ function renderAvvisi(){
 let editing=null, draft=null;
 function renderScheda(){
   const el=$("#v-scheda");
+  if(editing==="pick"){
+    el.innerHTML=`<h2 class="t">Nuovo soggetto</h2>
+      <p class="sub" style="margin:0 2px 12px">Quale prodotto hai acquistato?</p>
+      <div class="prodlist card q" style="padding:12px">${productButtons()}</div>
+      <button class="btn ghost sm" style="margin-top:12px" onclick="cancelEdit()">Annulla</button>`;
+    return;
+  }
   if(!editing && !horses.length){ el.innerHTML=setupCard(); return; }
   if(editing){
     const h = editing==="new" ? draft : horses.find(x=>x.id===editing);
-    el.innerHTML=`<h2 class="t">${editing==="new"?"Nuovo cavallo":"Modifica scheda"}</h2>
+    const p=profOf(h); const two=twoSensor(h); const isBaby=p.tipo==="bambino";
+    const roleRow=(role,emo,lbl)=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="sub" style="flex:1">${emo} ${lbl}: <b>${h.roles&&h.roles[role]?(live.get(h.roles[role])?.mac||live.get(h.roles[role])?.name||h.roles[role]):"— non assegnato"}</b></span>${h.roles&&h.roles[role]?`<button class="rb" onclick="unassignHorse('${h.id}','${role}')">Scollega</button>`:""}</div>`;
+    el.innerHTML=`<h2 class="t">${editing==="new"?"Nuovo "+subjNoun(h):"Modifica scheda"}</h2>
       <div class="card">
+        <div class="ptag"><span class="pe">${p.emoji}</span> ${p.label} · ${p.sensori.length} sensor${p.sensori.length>1?"i":"e"}</div>
         <label class="f">Nome</label><input class="f" id="h-name" value="${h.name||""}">
-        <div class="two"><div><label class="f">Razza</label><input class="f" id="h-breed" value="${h.breed||""}"></div>
+        ${isBaby?"":`<div class="two"><div><label class="f">Razza</label><input class="f" id="h-breed" value="${h.breed||""}"></div>
           <div><label class="f">Sesso</label><input class="f" id="h-sex" value="${h.sex||""}"></div></div>
         <div class="two"><div><label class="f">Età</label><input class="f" id="h-age" value="${h.age||""}"></div>
-          <div><label class="f">Peso (kg)</label><input class="f" id="h-weight" value="${h.weight||""}"></div></div>
-        <label class="f">Coperta</label><input class="f" id="h-blanket" value="${h.blanket||""}">
-        <label class="f">Box / scuderia</label><input class="f" id="h-box" value="${h.box||""}">
+          <div><label class="f">Peso (kg)</label><input class="f" id="h-weight" value="${h.weight||""}"></div></div>`}
+        <label class="f">${capoLabel(h)}</label><input class="f" id="h-blanket" value="${h.blanket||""}">
+        <label class="f">${isBaby?"Stanza":"Box / scuderia"}</label><input class="f" id="h-box" value="${h.box||""}">
         <label class="f">Note</label><input class="f" id="h-notes" value="${h.notes||""}">
         <div class="sec" style="margin-left:0">Sensori abbinati</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="sub" style="flex:1">🩺 Interno (sotto coperta): <b>${h.roles&&h.roles.under?(live.get(h.roles.under)?.mac||live.get(h.roles.under)?.name||h.roles.under):"— non assegnato"}</b></span>${h.roles&&h.roles.under?`<button class="rb" onclick="unassignHorse('${h.id}','under')">Scollega</button>`:""}</div>
-        <div style="display:flex;align-items:center;gap:8px"><span class="sub" style="flex:1">🌡️ Esterno: <b>${h.roles&&h.roles.ext?(live.get(h.roles.ext)?.mac||live.get(h.roles.ext)?.name||h.roles.ext):"— non assegnato"}</b></span>${h.roles&&h.roles.ext?`<button class="rb" onclick="unassignHorse('${h.id}','ext')">Scollega</button>`:""}</div>
+        ${roleRow("under","🩺",underMeta(h).label)}
+        ${two?roleRow("ext","🌡️","Esterno"):""}
         <p class="sub" style="margin-top:8px">Per assegnare o cambiare i sensori usa il tab <b>Sensori</b> (avvicina o soffia per riconoscerli).</p>
+        ${p.nota?`<p class="sub disc">⚠️ ${p.nota}</p>`:""}
         <button class="btn" style="margin-top:14px" onclick="saveHorse()">Salva</button>
         <button class="btn ghost sm" style="margin-top:8px" onclick="cancelEdit()">Annulla</button>
-        ${editing!=="new"?`<button class="btn danger sm" style="margin-top:8px" onclick="askDelete('${editing}')">Elimina cavallo</button>`:""}
+        ${editing!=="new"?`<button class="btn danger sm" style="margin-top:8px" onclick="askDelete('${editing}')">Elimina ${subjNoun(h)}</button>`:""}
       </div>`;
     return;
   }
-  el.innerHTML=`<h2 class="t">I miei cavalli</h2>
-    <p class="sub" style="margin:0 2px 12px">Tocca un cavallo per selezionarlo, <b>✎</b> per modificarlo, <b>🗑</b> per eliminarlo.</p>`+
+  el.innerHTML=`<h2 class="t">I miei soggetti</h2>
+    <p class="sub" style="margin:0 2px 12px">Tocca un soggetto per selezionarlo, <b>✎</b> per modificarlo, <b>🗑</b> per eliminarlo.</p>`+
     horses.map(h=>{
-      const r=readingsFor(h); const c=comfort(r.uT,r.uH,r.eT);
+      const c=comfort(profOf(h),readingsFor(h));
       const pill=c?`<span class="pill" style="color:${c.color};background:color-mix(in srgb,${c.color} 13%,transparent)">${c.label}</span>`
                  :`<span class="pill" style="color:var(--muted);background:var(--surface2)">${h.roles.under?"in attesa":"no sensori"}</span>`;
       return `<div class="hcard ${h.id===activeId?"on":""}" data-id="${h.id}">
-          <div class="av" onclick="setActive('${h.id}')">🐎</div>
+          <div class="av" onclick="setActive('${h.id}')">${emojiOf(h)}</div>
           <div class="sp" onclick="setActive('${h.id}')"><div class="nm" style="font-family:var(--serif);font-size:16px;font-weight:700">${h.name}</div>
-            <div class="mt" style="font-size:11.5px;color:var(--muted)">${[h.breed,h.blanket].filter(Boolean).join(" · ")||"scheda da completare"}</div></div>
+            <div class="mt" style="font-size:11.5px;color:var(--muted)">${[profOf(h).label,h.breed,h.blanket].filter(Boolean).join(" · ")||"scheda da completare"}</div></div>
           ${pill}
           <button class="edit" onclick="editHorse('${h.id}')">✎</button>
           <button class="edit del-btn" onclick="askDelete('${h.id}')">🗑</button>
       </div>`;
     }).join("")+
-    `<button class="btn" style="margin-top:6px" onclick="newHorse()">＋ Aggiungi cavallo</button>`;
+    `<button class="btn" style="margin-top:6px" onclick="newHorse()">＋ Aggiungi soggetto</button>`;
 }
 
 function renderSensori(){
   const el=$("#v-sensori"); const h=activeHorse();
   if(!h){ el.innerHTML=setupCard(); return; }
+  const two=twoSensor(h); const uShort=underMeta(h).short;
   const now=Date.now();
   const list=[...live.values()].filter(d=>d.temp!=null).sort((a,b)=>(b.rssi??-999)-(a.rssi??-999));
   const maxRssi=list.length?Math.max(...list.map(d=>d.rssi??-999)):-999;
   const roleName=id=>h.roles.under===id?"under":h.roles.ext===id?"ext":null;
+  const assignTxt=two?"<b>"+uShort+"</b> o <b>Esterno</b>":"il sensore";
   el.innerHTML=horseSelector()+`<h2 class="t">Sensori di ${h.name}</h2>
-    <div class="notice">Non sai quale sensore è quale? <b>Avvicina</b> un sensore al telefono (compare 📍 <b>più vicino</b>) oppure <b>soffiaci sopra</b> 2″ (compare 🌬️ <b>questo!</b>). Poi assegna <b>Sotto coperta</b> o <b>Esterno</b>. ${!navigator.bluetooth?"⚠️ Web Bluetooth non disponibile in questo browser.":""}</div>
+    <div class="notice">Non sai quale sensore è quale? <b>Avvicina</b> un sensore al telefono (compare 📍 <b>più vicino</b>) oppure <b>soffiaci sopra</b> 2″ (compare 🌬️ <b>questo!</b>). Poi assegna ${assignTxt}. ${!navigator.bluetooth&&!NATIVE?"⚠️ Web Bluetooth non disponibile in questo browser.":""}</div>
     <button class="btn ${scanning?"ghost":""}" onclick="toggleScan()">${scanning?"⏸ Ferma monitoraggio":"🔍 Avvia monitoraggio / cerca"}</button>
     <div class="notice" style="border-left-color:var(--gold)">Diagnostica — modalità <b>${NATIVE?"nativa (app)":"web"}</b> · pacchetti BLE: <b>${rawCount}</b>${lastMfgKeys?` · id produttore: ${lastMfgKeys.join(", ")}`:""}${(NATIVE&&rawCount===0&&scanning)?"<br>0 pacchetti: controlla che <b>Bluetooth</b> e <b>Posizione</b> siano attivi e che i permessi siano concessi.":""}</div>
     <div class="sec">Sensori rilevati (${list.length})</div>
@@ -485,32 +596,33 @@ function renderSensori(){
       <div class="rd">📡</div>
       <div class="sp"><div class="nm">${d.mac||d.name}${badge}</div><div class="mt">${d.mac?d.name+" · ":""}${d.temp.toFixed(1)}°C · umidità ${d.hum!=null?d.hum.toFixed(0)+"%":"—"} · ${d.rssi??"?"} dBm</div></div>
       <div class="rolebtns">
-        <button class="rb ${rn==="under"?"on":""}" onclick="assign('under','${d.id}')">Interno</button>
-        <button class="rb ${rn==="ext"?"on":""}" onclick="assign('ext','${d.id}')">Esterno</button>
+        <button class="rb ${rn==="under"?"on":""}" onclick="assign('under','${d.id}')">${two?uShort:(rn==="under"?"✓ abbinato":"Abbina")}</button>
+        ${two?`<button class="rb ${rn==="ext"?"on":""}" onclick="assign('ext','${d.id}')">Esterno</button>`:""}
       </div></div>`;}).join("")
-    :`<div class="card"><p class="sub">${scanning?"Scansione in corso… avvicina i sensori.":"Premi «Cerca sensori» per iniziare."}</p></div>`}
+    :`<div class="card"><p class="sub">${scanning?"Scansione in corso… avvicina i sensori.":"Premi «Avvia monitoraggio / cerca» per iniziare."}</p></div>`}
     <div class="sec">Abbinati a ${h.name}</div>
     <div class="card q">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="sub" style="flex:1">🩺 Interno: <b>${h.roles.under?(live.get(h.roles.under)?.mac||live.get(h.roles.under)?.name||h.roles.under):"—"}</b></span>${h.roles.under?`<button class="rb" onclick="unassignHorse('${h.id}','under')">Scollega</button>`:""}</div>
-      <div style="display:flex;align-items:center;gap:8px"><span class="sub" style="flex:1">🌡️ Esterno: <b>${h.roles.ext?(live.get(h.roles.ext)?.mac||live.get(h.roles.ext)?.name||h.roles.ext):"—"}</b></span>${h.roles.ext?`<button class="rb" onclick="unassignHorse('${h.id}','ext')">Scollega</button>`:""}</div>
+      <div style="display:flex;align-items:center;gap:8px;${two?"margin-bottom:8px":""}"><span class="sub" style="flex:1">🩺 ${uShort}: <b>${h.roles.under?(live.get(h.roles.under)?.mac||live.get(h.roles.under)?.name||h.roles.under):"—"}</b></span>${h.roles.under?`<button class="rb" onclick="unassignHorse('${h.id}','under')">Scollega</button>`:""}</div>
+      ${two?`<div style="display:flex;align-items:center;gap:8px"><span class="sub" style="flex:1">🌡️ Esterno: <b>${h.roles.ext?(live.get(h.roles.ext)?.mac||live.get(h.roles.ext)?.name||h.roles.ext):"—"}</b></span>${h.roles.ext?`<button class="rb" onclick="unassignHorse('${h.id}','ext')">Scollega</button>`:""}</div>`:""}
     </div>`;
 }
 
 /* ---------- actions ---------- */
 window.setActive=id=>{ activeId=id; store.set("activeId",activeId); go("home"); };
-window.newHorse=()=>{ editing="new"; draft=defaultHorse(); go("scheda"); };
+window.newHorse=(pid)=>{ if(!pid){ editing="pick"; draft=null; go("scheda"); return; }
+  editing="new"; draft=defaultHorse(pid); go("scheda"); };
 window.editHorse=id=>{ editing=id; go("scheda"); };
 window.cancelEdit=()=>{ editing=null; draft=null; renderScheda(); };
 window.saveHorse=()=>{
   const g=k=>$("#h-"+k)?.value.trim()??"";
   const fields=["name","breed","sex","age","weight","blanket","box","notes"];
-  if(editing==="new"){ fields.forEach(k=>draft[k]=g(k)); if(!draft.name)draft.name="Nuovo cavallo"; horses.push(draft); activeId=draft.id; }
+  if(editing==="new"){ fields.forEach(k=>draft[k]=g(k)); if(!draft.name)draft.name="Nuovo "+subjNoun(draft); horses.push(draft); activeId=draft.id; }
   else{ const h=horses.find(x=>x.id===editing); if(h) fields.forEach(k=>h[k]=g(k)); }
   store.set("horses",horses); store.set("activeId",activeId);
   editing=null; draft=null; go("home");
 };
 window.askDelete=id=>{ const h=horses.find(x=>x.id===id); if(!h) return;
-  if(confirm("Eliminare "+(h.name||"questo cavallo")+"? L'operazione non è reversibile.")) deleteHorse(id); };
+  if(confirm("Eliminare "+(h.name||"questo soggetto")+"? L'operazione non è reversibile.")) deleteHorse(id); };
 window.deleteHorse=id=>{ horses=horses.filter(h=>h.id!==id);
   if(!horses.some(h=>h.id===activeId)) activeId = horses[0] ? horses[0].id : null;
   store.set("horses",horses); store.set("activeId",activeId);
