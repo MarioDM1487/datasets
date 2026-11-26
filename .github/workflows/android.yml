@@ -34,6 +34,11 @@ jobs:
           java-version: '17'
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Skip the action's default install, which pulls the obsolete 'tools'
+          # package (removed by Google) and fails. We install exactly what we
+          # need in the next step.
+          packages: ''
 
       - name: Install Android SDK packages
         run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
