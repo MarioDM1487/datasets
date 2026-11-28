@@ -44,6 +44,28 @@
 
   .view{display:none} .view.on{display:block}
 
+  /* Hub mode: una preschermata che divide le sezioni (cavalli/cani/bimbi). */
+  .hubbtn{display:none;flex:0 0 auto;width:30px;height:30px;border-radius:9px;border:1px solid var(--line);
+    background:var(--surface);color:var(--accent);font-size:20px;font-weight:800;line-height:1;cursor:pointer;align-items:center;justify-content:center}
+  body:not(.in-hub) .hubbtn{display:inline-flex}
+  .logo{cursor:pointer}
+  body.in-hub .nav{display:none}
+  body.in-hub #v-home,body.in-hub #v-storico,body.in-hub #v-avvisi,body.in-hub #v-scheda,body.in-hub #v-sensori{display:none!important}
+  #v-hub{display:none} body.in-hub #v-hub{display:block}
+
+  .cat{display:flex;align-items:center;gap:14px;width:100%;text-align:left;cursor:pointer;
+    background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 16px;margin-bottom:11px;color:var(--text);transition:.15s}
+  .cat:hover,.cat:active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+  .cat .ce{font-size:32px;flex:0 0 auto;width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--bg2)}
+  .cat .ct{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+  .cat .ct b{font-family:var(--serif);font-size:18px}
+  .cat .ct small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cat .cc{flex:0 0 auto;min-width:26px;height:26px;padding:0 8px;border-radius:999px;display:grid;place-items:center;
+    font-size:12px;font-weight:800;background:color-mix(in srgb,var(--accent) 13%,transparent);color:var(--accent)}
+  .cat .cc.zero{background:var(--surface2);color:var(--muted)}
+  .hubhead{font-family:var(--serif);font-size:22px;margin:4px 2px 4px}
+  .hubsub{color:var(--muted);font-size:13px;margin:0 2px 18px;line-height:1.5}
+
   .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:12px}
   .card.q{background:var(--surface2)}
   h2.t{font-family:var(--serif);font-size:18px;margin:2px 2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -164,13 +186,15 @@
 <body>
 
 <div class="appbar">
-  <span class="logo">TEP<span class="d">O</span>RE</span>
+  <button class="hubbtn" onclick="showHub()" aria-label="Sezioni">‹</button>
+  <span class="logo" onclick="showHub()">TEP<span class="d">O</span>RE</span>
   <span class="sp"></span>
   <span class="live"><span class="dot" id="live"></span><span id="liveTxt">non attivo</span></span>
 </div>
 
 <div id="notice"></div>
 
+<section class="view" id="v-hub"></section>
 <section class="view on" id="v-home"></section>
 <section class="view" id="v-storico"></section>
 <section class="view" id="v-avvisi"></section>
@@ -257,7 +281,11 @@ if(!horses.some(h=>h.id===activeId)) activeId = horses[0] ? horses[0].id : null;
 let historyMap = store.get("history_v2", {});
 let alertsMap  = store.get("alerts_v2", {});
 
-const activeHorse=()=>horses.find(h=>h.id===activeId)||horses[0]||null;
+/* Sezione attiva = profilo scelto nell'hub (null = mostra l'hub). */
+let activeCat = store.get("activeCat", null);
+if(activeCat && !PROFILI[activeCat]) activeCat=null;
+const catList = ()=> horses.filter(h=>h.profile===activeCat);
+const activeHorse=()=>{ const l=catList(); return l.find(h=>h.id===activeId)||l[0]||null; };
 const histOf=id=>historyMap[id]||(historyMap[id]=[]);
 const alertsOf=id=>alertsMap[id]||(alertsMap[id]=[]);
 
@@ -392,8 +420,8 @@ function sampleAll(){
 const timeAgo=ts=>{ if(!ts) return "—"; const s=Math.round((Date.now()-ts)/1000); return s<60?s+"″ fa":Math.round(s/60)+"′ fa"; };
 const hhmm=ts=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
 function horseSelector(){
-  return `<div class="hsel">`+horses.map(h=>`<button class="hchip ${h.id===activeId?"on":""}" onclick="setActive('${h.id}')">${emojiOf(h)} ${h.name||"—"}</button>`).join("")
-    +`<button class="hchip add" onclick="newHorse()">＋ Nuovo</button></div>`;
+  return `<div class="hsel">`+catList().map(h=>`<button class="hchip ${h.id===activeId?"on":""}" onclick="setActive('${h.id}')">${emojiOf(h)} ${h.name||"—"}</button>`).join("")
+    +`<button class="hchip add" onclick="newHorse(activeCat)">＋ Nuovo</button></div>`;
 }
 
 /* ---------- views ---------- */
@@ -405,12 +433,28 @@ function productButtons(){
       <span class="pa">›</span></button>`;}).join("");
 }
 function setupCard(){
+  const p=PROFILI[activeCat]||PROFILI["cavallo-coperta"];
+  const two=p.modello==="delta";
   return `<div class="card q" style="text-align:center;padding:24px 18px 20px;margin-top:8px">
-    <div class="av" style="width:60px;height:60px;border-radius:18px;font-size:30px;margin:0 auto 12px">🌡️</div>
-    <h2 class="t" style="font-size:21px;margin:0">Benvenuto in Tepore</h2>
-    <p class="sub" style="margin:8px auto 2px;max-width:34ch">Quale prodotto hai acquistato? La scelta configura sensori e soglie.</p>
-    <div class="prodlist">${productButtons()}</div>
+    <div class="av" style="width:60px;height:60px;border-radius:18px;font-size:30px;margin:0 auto 12px">${p.emoji}</div>
+    <h2 class="t" style="font-size:21px;margin:0">Sezione ${p.label}</h2>
+    <p class="sub" style="margin:8px auto 2px;max-width:34ch">Non hai ancora nessun ${p.label.toLowerCase()}. Creane uno: poi gli abbinerai ${two?"i due sensori":"il sensore"}.</p>
+    <button class="btn" style="margin-top:16px" onclick="newHorse('${activeCat}')">＋ Crea ${p.label.toLowerCase()}</button>
   </div>`;
+}
+
+/* ---------- Hub: preschermata che divide le sezioni ---------- */
+function renderHub(){
+  const el=$("#v-hub");
+  const cards=PROFILE_ORDER.map(id=>{const p=PROFILI[id];
+    const n=horses.filter(h=>h.profile===id).length;
+    return `<button class="cat" onclick="setCat('${id}')">
+      <span class="ce">${p.emoji}</span>
+      <span class="ct"><b>${p.label}</b><small>${n>0?n+" "+(n===1?"soggetto":"soggetti"):"nessun soggetto · tocca per iniziare"}</small></span>
+      <span class="cc ${n?"":"zero"}">${n}</span></button>`;}).join("");
+  el.innerHTML=`<h2 class="hubhead">Le tue sezioni</h2>
+    <p class="hubsub">Scegli cosa vuoi monitorare. Ogni sezione mostra solo i suoi soggetti, con sensori e soglie dedicati.</p>
+    ${cards}`;
 }
 function renderHome(){
   const el=$("#v-home"); const h=activeHorse();
@@ -556,22 +600,23 @@ function renderScheda(){
       </div>`;
     return;
   }
-  el.innerHTML=`<h2 class="t">I miei soggetti</h2>
+  const pc=PROFILI[activeCat]||PROFILI["cavallo-coperta"];
+  el.innerHTML=`<h2 class="t">${pc.emoji} ${pc.label} — soggetti</h2>
     <p class="sub" style="margin:0 2px 12px">Tocca un soggetto per selezionarlo, <b>✎</b> per modificarlo, <b>🗑</b> per eliminarlo.</p>`+
-    horses.map(h=>{
+    catList().map(h=>{
       const c=comfort(profOf(h),readingsFor(h));
       const pill=c?`<span class="pill" style="color:${c.color};background:color-mix(in srgb,${c.color} 13%,transparent)">${c.label}</span>`
                  :`<span class="pill" style="color:var(--muted);background:var(--surface2)">${h.roles.under?"in attesa":"no sensori"}</span>`;
       return `<div class="hcard ${h.id===activeId?"on":""}" data-id="${h.id}">
           <div class="av" onclick="setActive('${h.id}')">${emojiOf(h)}</div>
           <div class="sp" onclick="setActive('${h.id}')"><div class="nm" style="font-family:var(--serif);font-size:16px;font-weight:700">${h.name}</div>
-            <div class="mt" style="font-size:11.5px;color:var(--muted)">${[profOf(h).label,h.breed,h.blanket].filter(Boolean).join(" · ")||"scheda da completare"}</div></div>
+            <div class="mt" style="font-size:11.5px;color:var(--muted)">${[h.breed,h.blanket].filter(Boolean).join(" · ")||"scheda da completare"}</div></div>
           ${pill}
           <button class="edit" onclick="editHorse('${h.id}')">✎</button>
           <button class="edit del-btn" onclick="askDelete('${h.id}')">🗑</button>
       </div>`;
     }).join("")+
-    `<button class="btn" style="margin-top:6px" onclick="newHorse()">＋ Aggiungi soggetto</button>`;
+    `<button class="btn" style="margin-top:6px" onclick="newHorse('${activeCat}')">＋ Aggiungi ${pc.label.toLowerCase()}</button>`;
 }
 
 function renderSensori(){
@@ -609,8 +654,15 @@ function renderSensori(){
 
 /* ---------- actions ---------- */
 window.setActive=id=>{ activeId=id; store.set("activeId",activeId); go("home"); };
-window.newHorse=(pid)=>{ if(!pid){ editing="pick"; draft=null; go("scheda"); return; }
+window.newHorse=(pid)=>{ pid=pid||activeCat||"cavallo-coperta";
   editing="new"; draft=defaultHorse(pid); go("scheda"); };
+/* Hub: scegli la sezione / torna all'hub */
+window.setCat=cat=>{ if(!PROFILI[cat]) return; activeCat=cat; store.set("activeCat",cat);
+  document.body.classList.remove("in-hub");
+  if(!catList().some(h=>h.id===activeId)){ const l=catList(); activeId=l[0]?l[0].id:null; store.set("activeId",activeId); }
+  go("home"); };
+window.showHub=()=>{ activeCat=null; store.set("activeCat",null); editing=null; draft=null;
+  document.body.classList.add("in-hub"); renderHub(); window.scrollTo(0,0); };
 window.editHorse=id=>{ editing=id; go("scheda"); };
 window.cancelEdit=()=>{ editing=null; draft=null; renderScheda(); };
 window.saveHorse=()=>{
@@ -624,9 +676,9 @@ window.saveHorse=()=>{
 window.askDelete=id=>{ const h=horses.find(x=>x.id===id); if(!h) return;
   if(confirm("Eliminare "+(h.name||"questo soggetto")+"? L'operazione non è reversibile.")) deleteHorse(id); };
 window.deleteHorse=id=>{ horses=horses.filter(h=>h.id!==id);
-  if(!horses.some(h=>h.id===activeId)) activeId = horses[0] ? horses[0].id : null;
+  if(!catList().some(h=>h.id===activeId)){ const l=catList(); activeId=l[0]?l[0].id:null; }
   store.set("horses",horses); store.set("activeId",activeId);
-  editing=null; if(horses.length) renderScheda(); else go("home"); };
+  editing=null; renderScheda(); };
 window.assign=(role,id)=>{ const h=activeHorse(); if(h.roles[role]===id) delete h.roles[role];
   else{ h.roles[role]=id; const o=role==="under"?"ext":"under"; if(h.roles[o]===id) delete h.roles[o]; }
   store.set("horses",horses); renderSensori(); };
@@ -686,7 +738,7 @@ $(".live").addEventListener("click",()=>toggleScan());
 setInterval(()=>{ if(scanning && cur==="home") renderHome(); if(scanning && cur==="sensori") renderSensori(); },3000);
 
 if(!NATIVE && !navigator.bluetooth) notice("Apri Tepore in <b>Chrome su Android</b> (in HTTPS) per leggere i sensori. Su iPhone il web non accede al Bluetooth — arriverà con l'app nativa.");
-go("home");
+if(activeCat && PROFILI[activeCat]) go("home"); else showHub();
 // auto-start monitoring if sensors are already paired
 if(hasSensors()) startScan(true);
 </script>
